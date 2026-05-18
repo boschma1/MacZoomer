@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let permissions = PermissionCoordinator()
     lazy var hotkeys = HotkeyManager(preferences: preferences)
     lazy var zoomMode = ZoomMode(preferences: preferences, permissions: permissions)
+    lazy var drawingMode = DrawingMode()
 
     private var menuBarController: MenuBarController?
 
@@ -22,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             permissions: permissions,
             hotkeys: hotkeys,
             zoomMode: zoomMode,
+            drawingMode: drawingMode,
             openSettings: { [weak self] in self?.openSettings() }
         )
 
@@ -43,6 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 zoomMode.deactivate()
             } else {
                 zoomMode.activate()
+            }
+        case .draw, .liveDraw:
+            if drawingMode.isActive {
+                drawingMode.deactivate()
+            } else {
+                drawingMode.activate()
             }
         default:
             // Other actions land in later phases.

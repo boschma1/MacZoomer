@@ -8,6 +8,7 @@ final class MenuBarController {
     private let permissions: PermissionCoordinator
     private let hotkeys: HotkeyManager
     private let zoomMode: ZoomMode
+    private let drawingMode: DrawingMode
     private let openSettings: () -> Void
 
     private var cancellables = Set<AnyCancellable>()
@@ -17,12 +18,14 @@ final class MenuBarController {
         permissions: PermissionCoordinator,
         hotkeys: HotkeyManager,
         zoomMode: ZoomMode,
+        drawingMode: DrawingMode,
         openSettings: @escaping () -> Void
     ) {
         self.preferences = preferences
         self.permissions = permissions
         self.hotkeys = hotkeys
         self.zoomMode = zoomMode
+        self.drawingMode = drawingMode
         self.openSettings = openSettings
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -129,14 +132,20 @@ final class MenuBarController {
         }
     }
     @objc private func triggerLiveZoom()  { notImplemented("Live Zoom") }
-    @objc private func triggerDraw()      { notImplemented("Draw") }
+    @objc private func triggerDraw()      {
+        if drawingMode.isActive {
+            drawingMode.deactivate()
+        } else {
+            drawingMode.activate()
+        }
+    }
     @objc private func triggerBreak()     { notImplemented("Break Timer") }
     @objc private func triggerRecord()    { notImplemented("Record") }
 
     private func notImplemented(_ feature: String) {
         let alert = NSAlert()
         alert.messageText = "\(feature) is not implemented yet"
-        alert.informativeText = "MacZoomer is in Phase 0 (Foundations). This feature will ship in a later phase."
+        alert.informativeText = "This feature will ship in a later phase. See plan.md for the roadmap."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()
