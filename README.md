@@ -21,34 +21,6 @@ Every shortcut is rebindable in Settings → Hotkeys. Settings can be exported/i
 
 Out of scope for v1: OCR, DemoType, panorama recording, audio in recordings (deferred to v1.1).
 
-## Demos
-
-Animated walkthroughs of each feature. Captured with MacZoomer's own recording mode, then converted to GIF via [`scripts/mp4-to-gif.sh`](scripts/mp4-to-gif.sh). See [docs/demos/README.md](docs/demos/README.md) for how to regenerate or contribute new ones.
-
-### Zoom — freeze the screen and magnify (⌘1)
-
-![Zoom demo](docs/demos/zoom.gif)
-
-### Live Zoom — real-time magnification that follows the cursor (⌘4)
-
-![Live Zoom demo](docs/demos/live-zoom.gif)
-
-### Drawing & Annotation — pens, shapes, text, blur, whiteboard (⌘2)
-
-![Drawing demo](docs/demos/drawing.gif)
-
-### Break Timer — full-screen countdown for breaks between demos (⌘3)
-
-![Break Timer demo](docs/demos/break-timer.gif)
-
-### Screenshots — full screen, region, copy or save (⌘6 / ⌘⇧6 / ⌘⌃6 / ⌘⇧⌃6)
-
-![Screenshots demo](docs/demos/screenshots.gif)
-
-### Screen Recording — full screen, region, or single window to MP4 (⌘5 / ⌘⇧5 / ⌘⌥5)
-
-![Recording demo](docs/demos/recording.gif)
-
 ## Requirements
 
 - macOS 14 Sonoma or newer
