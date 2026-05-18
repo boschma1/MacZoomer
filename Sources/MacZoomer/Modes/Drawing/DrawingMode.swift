@@ -1,30 +1,51 @@
 import AppKit
 
-/// Top-level controller for the standalone drawing overlay (the ZoomIt
-/// "Draw" / "LiveDraw" feature — a transparent canvas spanning every display
-/// that the user can annotate while the desktop is live underneath).
+/// Top-level controller for the drawing overlay (the ZoomIt "Draw" feature
+/// — a full-screen canvas that the user can annotate after their current
+/// screen content has been frozen as a still image).
 ///
-/// Zoom+Draw composition (drawing on top of the frozen Zoom Mode image) is
-/// deferred to a follow-up phase; see plan.md.
+/// `activate(frozenImages:)` accepts pre-captured per-screen images, which is
+/// how the Zoom→Draw composition hands the current zoomed view to Draw mode.
+/// `activate()` does the screen capture itself.
 @MainActor
 public final class DrawingMode: ObservableObject {
     public let state = DrawingState()
+    private let capturer = ScreenCapturer()
+
     private var windows: [DrawingWindow] = []
     public private(set) var isActive = false
 
+    /// Set when capture fails so blur strokes degrade gracefully.
+    public private(set) var hasFrozenBackground = false
+
     public init() {}
 
+    /// Capture every connected display and present the draw overlay over it.
     public func activate() {
         guard !isActive else { return }
         isActive = true
 
-        for screen in NSScreen.screens {
-            let window = DrawingWindow(screen: screen, state: state)
-            window.canvas.onExit = { [weak self] in self?.deactivate() }
-            window.makeKeyAndOrderFront(nil as AnyObject?)
-            window.makeFirstResponder(window.canvas)
-            windows.append(window)
+        Task { @MainActor in
+            var captures: [DisplayCapture] = []
+            do {
+                captures = try await capturer.captureAllDisplays()
+            } catch {
+                // Capture failed — fall back to a transparent overlay so the
+                // user can still draw and type. Blur strokes won't render
+                // anything visible but the rest of the tools still work.
+                NSLog("MacZoomer: draw capture failed: \(error). Falling back to transparent overlay.")
+            }
+            present(captures: captures)
         }
+    }
+
+    /// Variant used by the Zoom→Draw handoff. The caller has already rendered
+    /// each display to a CGImage (typically the current zoomed view), so we
+    /// skip the screen-capture step.
+    public func activate(frozenImages: [DisplayCapture]) {
+        guard !isActive else { return }
+        isActive = true
+        present(captures: frozenImages)
     }
 
     public func deactivate() {
@@ -35,5 +56,27 @@ public final class DrawingMode: ObservableObject {
         }
         windows.removeAll()
         state.eraseAll()
+        hasFrozenBackground = false
+    }
+
+    private func present(captures: [DisplayCapture]) {
+        hasFrozenBackground = !captures.isEmpty
+        let capturesByScreen: [NSScreen: DisplayCapture] = Dictionary(
+            uniqueKeysWithValues: captures.map { ($0.screen, $0) }
+        )
+
+        for screen in NSScreen.screens {
+            let capture = capturesByScreen[screen]
+            let window = DrawingWindow(
+                screen: screen,
+                state: state,
+                frozenImage: capture?.image,
+                backingScale: capture?.backingScale ?? screen.backingScaleFactor
+            )
+            window.canvas.onExit = { [weak self] in self?.deactivate() }
+            window.makeKeyAndOrderFront(nil as AnyObject?)
+            window.makeFirstResponder(window.canvas)
+            windows.append(window)
+        }
     }
 }

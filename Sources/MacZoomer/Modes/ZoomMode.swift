@@ -66,6 +66,39 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
         }
     }
 
+    /// Tear down the zoom overlay immediately (no animation). Used by the
+    /// Zoom→Draw handoff which closes the zoom windows synchronously before
+    /// activating draw mode with their final visible state.
+    public func deactivateImmediately() {
+        guard isActive else { return }
+        isActive = false
+        for window in windows {
+            window.orderOut(nil)
+        }
+        windows.removeAll()
+        NSCursor.unhide()
+    }
+
+    /// Render every active zoom window's current view to a CGImage. The result
+    /// is one `DisplayCapture` per display, suitable for handing to
+    /// ``DrawingMode/activate(frozenImages:)`` so the user can annotate on
+    /// top of the zoomed image.
+    public func currentDisplayedImages() -> [DisplayCapture] {
+        var results: [DisplayCapture] = []
+        for window in windows {
+            guard let image = window.zoomView.renderCurrentView() else { continue }
+            guard let screen = window.screen ?? NSScreen.main else { continue }
+            let displayID = screen.displayID ?? CGMainDisplayID()
+            results.append(DisplayCapture(
+                screen: screen,
+                displayID: displayID,
+                image: image,
+                backingScale: screen.backingScaleFactor
+            ))
+        }
+        return results
+    }
+
     // MARK: - Presentation
 
     private func present(captures: [DisplayCapture]) {

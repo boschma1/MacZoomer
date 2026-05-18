@@ -28,7 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             zoomMode: zoomMode,
             drawingMode: drawingMode,
             breakTimerMode: breakTimerMode,
-            openSettings: { [weak self] in self?.openSettings() }
+            openSettings: { [weak self] in self?.openSettings() },
+            dispatchAction: { [weak self] action in self?.dispatch(action: action) }
         )
 
         permissions.refreshAll()
@@ -72,6 +73,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .draw, .liveDraw:
             if drawingMode.isActive {
                 drawingMode.deactivate()
+            } else if zoomMode.isActive {
+                // Zoom→Draw composition: hand the current zoomed view over to
+                // Draw as a frozen background so annotations land on top of
+                // exactly what the user is looking at.
+                let images = zoomMode.currentDisplayedImages()
+                zoomMode.deactivateImmediately()
+                if images.isEmpty {
+                    drawingMode.activate()
+                } else {
+                    drawingMode.activate(frozenImages: images)
+                }
             } else {
                 drawingMode.activate()
             }

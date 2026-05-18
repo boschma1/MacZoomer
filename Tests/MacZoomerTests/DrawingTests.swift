@@ -78,6 +78,103 @@ final class DrawingTests: XCTestCase {
         XCTAssertEqual(state.currentWidth, PenStyle.minWidth)
     }
 
+    // MARK: - DrawingTool & text editing
+
+    @MainActor
+    func testDefaultToolIsInk() {
+        XCTAssertEqual(DrawingState().currentTool, .ink)
+    }
+
+    @MainActor
+    func testSetToolUpdatesCurrentTool() {
+        let state = DrawingState()
+        state.setTool(.blur)
+        XCTAssertEqual(state.currentTool, .blur)
+        state.setTool(.text)
+        XCTAssertEqual(state.currentTool, .text)
+    }
+
+    @MainActor
+    func testSwitchingAwayFromTextCommitsInProgressDraft() {
+        let state = DrawingState()
+        state.setTool(.text)
+        state.beginText(at: CGPoint(x: 10, y: 20))
+        state.appendText("hello")
+        XCTAssertNotNil(state.inProgressText)
+        state.setTool(.ink)
+        XCTAssertNil(state.inProgressText)
+        XCTAssertEqual(state.annotations.count, 1)
+        if case .text(let stamp) = state.annotations.first {
+            XCTAssertEqual(stamp.text, "hello")
+        } else {
+            XCTFail("Expected committed text annotation")
+        }
+    }
+
+    @MainActor
+    func testEmptyTextDraftIsNotCommitted() {
+        let state = DrawingState()
+        state.setTool(.text)
+        state.beginText(at: .zero)
+        let committed = state.commitInProgressText()
+        XCTAssertFalse(committed)
+        XCTAssertTrue(state.annotations.isEmpty)
+    }
+
+    @MainActor
+    func testAppendAndBackspaceMutateInProgressText() {
+        let state = DrawingState()
+        state.beginText(at: .zero)
+        state.appendText("abc")
+        state.appendText("d")
+        XCTAssertEqual(state.inProgressText?.text, "abcd")
+        state.deleteBackwardInText()
+        XCTAssertEqual(state.inProgressText?.text, "abc")
+    }
+
+    @MainActor
+    func testCancelInProgressTextDiscardsDraft() {
+        let state = DrawingState()
+        state.beginText(at: .zero)
+        state.appendText("hi")
+        state.cancelInProgressText()
+        XCTAssertNil(state.inProgressText)
+        XCTAssertTrue(state.annotations.isEmpty)
+    }
+
+    @MainActor
+    func testAdjustTextFontSizeClampsToBounds() {
+        let state = DrawingState()
+        state.beginText(at: .zero)
+        state.adjustTextFontSize(by: -10_000)
+        XCTAssertEqual(state.inProgressText?.fontSize, DrawingState.minTextFontSize)
+        state.adjustTextFontSize(by: 10_000)
+        XCTAssertEqual(state.inProgressText?.fontSize, DrawingState.maxTextFontSize)
+    }
+
+    @MainActor
+    func testEraseAllClearsInProgressTextToo() {
+        let state = DrawingState()
+        state.beginText(at: .zero)
+        state.appendText("draft")
+        state.eraseAll()
+        XCTAssertNil(state.inProgressText)
+    }
+
+    // MARK: - DrawingAnnotation.style
+
+    func testBlurAnnotationHasNoStyle() {
+        let blur = DrawingAnnotation.blur(BlurStroke(width: 20, points: [.zero]))
+        XCTAssertNil(blur.style)
+    }
+
+    func testTextAnnotationStyleMatchesStamp() {
+        let pen = PenStyle(color: .green, width: 4)
+        let stamp = TextStamp(style: pen, origin: .zero, text: "x", fontSize: 18)
+        let annotation = DrawingAnnotation.text(stamp)
+        XCTAssertEqual(annotation.style?.color, .green)
+    }
+
     // MARK: - PenColor
 
     func testEveryPenColorHasUniqueShortcut() {
@@ -97,7 +194,8 @@ final class DrawingTests: XCTestCase {
     func testSnapAngleRoundsTo15Degrees() {
         let start = CGPoint.zero
         // 5° from horizontal — should snap to 0°.
-        let end = CGPoint(x: cos(5 * .pi / 180), y: sin(5 * .pi / 180))
+        let angle: CGFloat = 5 * .pi / 180
+        let end = CGPoint(x: cos(angle), y: sin(angle))
         let snapped = DrawingGeometry.snapAngle(from: start, to: end, snapEnabled: true)
         XCTAssertEqual(snapped.x, 1.0, accuracy: 1e-6)
         XCTAssertEqual(snapped.y, 0.0, accuracy: 1e-6)

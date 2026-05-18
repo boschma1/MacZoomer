@@ -122,6 +122,16 @@ final class ZoomView: NSView {
         CATransaction.commit()
     }
 
+    /// Render the currently displayed zoomed view to a CGImage. Used by the
+    /// Zoom→Draw handoff: the resulting bitmap becomes Draw mode's frozen
+    /// background, so annotations land on top of the zoomed-in view rather
+    /// than the original unzoomed screen capture.
+    func renderCurrentView() -> CGImage? {
+        guard let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
+        cacheDisplay(in: bounds, to: rep)
+        return rep.cgImage
+    }
+
     // MARK: - Layout
 
     override func layout() {

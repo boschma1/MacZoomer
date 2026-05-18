@@ -11,6 +11,7 @@ final class MenuBarController {
     private let drawingMode: DrawingMode
     private let breakTimerMode: BreakTimerMode
     private let openSettings: () -> Void
+    private let dispatchAction: (HotkeyAction) -> Void
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -21,7 +22,8 @@ final class MenuBarController {
         zoomMode: ZoomMode,
         drawingMode: DrawingMode,
         breakTimerMode: BreakTimerMode,
-        openSettings: @escaping () -> Void
+        openSettings: @escaping () -> Void,
+        dispatchAction: @escaping (HotkeyAction) -> Void
     ) {
         self.preferences = preferences
         self.permissions = permissions
@@ -30,6 +32,7 @@ final class MenuBarController {
         self.drawingMode = drawingMode
         self.breakTimerMode = breakTimerMode
         self.openSettings = openSettings
+        self.dispatchAction = dispatchAction
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         configureButton()
@@ -127,28 +130,10 @@ final class MenuBarController {
 
     // MARK: - Mode placeholders (real implementations land in later phases)
 
-    @objc private func triggerZoom()      {
-        if zoomMode.isActive {
-            zoomMode.deactivate()
-        } else {
-            zoomMode.activate()
-        }
-    }
+    @objc private func triggerZoom()      { dispatchAction(.zoom) }
     @objc private func triggerLiveZoom()  { notImplemented("Live Zoom") }
-    @objc private func triggerDraw()      {
-        if drawingMode.isActive {
-            drawingMode.deactivate()
-        } else {
-            drawingMode.activate()
-        }
-    }
-    @objc private func triggerBreak()     {
-        if breakTimerMode.isActive {
-            breakTimerMode.deactivate()
-        } else {
-            breakTimerMode.activate()
-        }
-    }
+    @objc private func triggerDraw()      { dispatchAction(.draw) }
+    @objc private func triggerBreak()     { dispatchAction(.breakTimer) }
     @objc private func triggerRecord()    { notImplemented("Record") }
 
     private func notImplemented(_ feature: String) {

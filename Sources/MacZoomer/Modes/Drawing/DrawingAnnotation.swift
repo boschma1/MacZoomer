@@ -8,14 +8,18 @@ public enum DrawingAnnotation: Sendable {
     case rectangle(StraightShape)
     case ellipse(StraightShape)
     case arrow(StraightShape)
+    case blur(BlurStroke)
+    case text(TextStamp)
 
-    public var style: PenStyle {
+    public var style: PenStyle? {
         switch self {
         case .freehand(let s):   return s.style
         case .line(let s),
              .rectangle(let s),
              .ellipse(let s),
              .arrow(let s):      return s.style
+        case .text(let t):       return t.style
+        case .blur:              return nil
         }
     }
 }
@@ -39,6 +43,34 @@ public struct StraightShape: Sendable {
         self.style = style
         self.start = start
         self.end = end
+    }
+}
+
+/// A blur-pen stroke. Has only a width (the brush thickness) and a path; the
+/// canvas renders it by drawing a Gaussian-blurred copy of the frozen
+/// background clipped to the path's stroke.
+public struct BlurStroke: Sendable {
+    public let width: CGFloat
+    public var points: [CGPoint]
+
+    public init(width: CGFloat, points: [CGPoint] = []) {
+        self.width = width
+        self.points = points
+    }
+}
+
+/// A committed text annotation. Position is the baseline anchor.
+public struct TextStamp: Sendable, Equatable {
+    public let style: PenStyle
+    public var origin: CGPoint
+    public var text: String
+    public var fontSize: CGFloat
+
+    public init(style: PenStyle, origin: CGPoint, text: String, fontSize: CGFloat) {
+        self.style = style
+        self.origin = origin
+        self.text = text
+        self.fontSize = fontSize
     }
 }
 
