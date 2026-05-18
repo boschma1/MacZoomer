@@ -1,0 +1,79 @@
+name: MacZoomer
+options:
+  bundleIdPrefix: com.markusbosch
+  deploymentTarget:
+    macOS: "14.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+
+targets:
+  MacZoomer:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MacZoomer
+        excludes:
+          - "Resources/Info.plist"
+          - "Resources/MacZoomer.entitlements"
+    resources:
+      - path: Sources/MacZoomer/Resources/Assets.xcassets
+        optional: true
+    info:
+      path: Sources/MacZoomer/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: MacZoomer
+        CFBundleName: MacZoomer
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        NSHighResolutionCapable: true
+        NSScreenCaptureUsageDescription: "MacZoomer needs Screen Recording access to magnify, annotate, and record your screen."
+        NSAppleEventsUsageDescription: "MacZoomer uses Apple Events to lock the workstation when the break timer starts."
+    entitlements:
+      path: Sources/MacZoomer/Resources/MacZoomer.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.cs.allow-jit: false
+        com.apple.security.cs.allow-unsigned-executable-memory: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.markusbosch.MacZoomer
+        GENERATE_INFOPLIST_FILE: NO
+
+  MacZoomerTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/MacZoomerTests
+    dependencies:
+      - target: MacZoomer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.markusbosch.MacZoomerTests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  MacZoomer:
+    build:
+      targets:
+        MacZoomer: all
+        MacZoomerTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MacZoomerTests
+    archive:
+      config: Release

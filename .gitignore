@@ -1,0 +1,41 @@
+# Xcode / SwiftPM
+build/
+DerivedData/
+.build/
+.swiftpm/
+Packages/
+*.xcodeproj/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Signing / secrets
+*.p12
+*.cer
+*.mobileprovision
+ExportOptions.plist
+.env
+.env.*
+
+# Sparkle private key
+sparkle_eddsa_priv.pem
+sparkle_eddsa_priv.key
+
+# Archives / artifacts
+*.xcarchive
+*.dmg
+*.zip
+artifacts/
+
+# XcodeGen output
+MacZoomer.xcodeproj
