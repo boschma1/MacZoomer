@@ -7,6 +7,7 @@ final class MenuBarController {
     private let preferences: Preferences
     private let permissions: PermissionCoordinator
     private let hotkeys: HotkeyManager
+    private let zoomMode: ZoomMode
     private let openSettings: () -> Void
 
     private var cancellables = Set<AnyCancellable>()
@@ -15,11 +16,13 @@ final class MenuBarController {
         preferences: Preferences,
         permissions: PermissionCoordinator,
         hotkeys: HotkeyManager,
+        zoomMode: ZoomMode,
         openSettings: @escaping () -> Void
     ) {
         self.preferences = preferences
         self.permissions = permissions
         self.hotkeys = hotkeys
+        self.zoomMode = zoomMode
         self.openSettings = openSettings
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -118,7 +121,13 @@ final class MenuBarController {
 
     // MARK: - Mode placeholders (real implementations land in later phases)
 
-    @objc private func triggerZoom()      { notImplemented("Zoom") }
+    @objc private func triggerZoom()      {
+        if zoomMode.isActive {
+            zoomMode.deactivate()
+        } else {
+            zoomMode.activate()
+        }
+    }
     @objc private func triggerLiveZoom()  { notImplemented("Live Zoom") }
     @objc private func triggerDraw()      { notImplemented("Draw") }
     @objc private func triggerBreak()     { notImplemented("Break Timer") }
