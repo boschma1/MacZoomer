@@ -11,6 +11,13 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
     private var windows: [ZoomWindow] = []
     private(set) var isActive = false
 
+    /// We call `CGRequestScreenCaptureAccess()` at most once per process to
+    /// register a TCC entry and trigger the system permission prompt.
+    /// Subsequent denials just route the user back to our friendly alert,
+    /// which is a much better experience than the system dialog reappearing
+    /// on every hotkey press.
+    private var hasTriggeredSystemPermissionPrompt = false
+
     public init(preferences: Preferences, permissions: PermissionCoordinator) {
         self.preferences = preferences
         self.permissions = permissions
@@ -31,8 +38,7 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
                 present(captures: captures)
             } catch ScreenCaptureError.permissionDenied {
                 isActive = false
-                permissions.requestIfNeeded(.screenRecording)
-                presentPermissionAlert()
+                handlePermissionDenied()
             } catch {
                 isActive = false
                 NSLog("MacZoomer: zoom capture failed: \(error)")
@@ -105,10 +111,26 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
         NSCursor.hide()
     }
 
+    private func handlePermissionDenied() {
+        // The first time we see "denied", trigger the system prompt so a TCC
+        // entry is registered for the app (otherwise the user has nothing to
+        // toggle in System Settings → Privacy & Security → Screen Recording).
+        // On subsequent denials we just show our own alert.
+        if !hasTriggeredSystemPermissionPrompt {
+            hasTriggeredSystemPermissionPrompt = true
+            permissions.requestIfNeeded(.screenRecording)
+        }
+        presentPermissionAlert()
+    }
+
     private func presentPermissionAlert() {
         let alert = NSAlert()
         alert.messageText = "Screen Recording permission needed"
-        alert.informativeText = "MacZoomer can't capture the screen for Zoom Mode until Screen Recording is enabled in System Settings."
+        alert.informativeText = """
+            MacZoomer can't capture the screen for Zoom Mode until Screen Recording is enabled in System Settings.
+
+            After enabling it, please quit MacZoomer and relaunch — macOS only applies the new permission at process start.
+            """
         alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn {

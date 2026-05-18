@@ -18,6 +18,43 @@ final class DrawingCanvas: NSView {
 
     var onExit: (() -> Void)?
 
+    /// Black-on-white pencil cursor, hotspot at the pencil's writing tip.
+    /// Composed by drawing the SF Symbol twice — once heavy/white as a halo
+    /// for legibility on dark backgrounds, then once regular/black on top.
+    private static let drawingCursor: NSCursor = {
+        let symbolName = "pencil"
+        let foreground = NSImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.black]))
+        let halo = NSImage.SymbolConfiguration(pointSize: 18, weight: .heavy)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
+
+        guard
+            let fg = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Drawing pencil")?
+                .withSymbolConfiguration(foreground),
+            let bg = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+                .withSymbolConfiguration(halo)
+        else {
+            return .crosshair
+        }
+
+        let size = bg.size
+        let composite = NSImage(size: size, flipped: false) { _ in
+            bg.draw(at: .zero, from: .zero, operation: .sourceOver, fraction: 1.0)
+            let inset = NSPoint(
+                x: (size.width - fg.size.width) / 2,
+                y: (size.height - fg.size.height) / 2
+            )
+            fg.draw(at: inset, from: .zero, operation: .sourceOver, fraction: 1.0)
+            return true
+        }
+
+        // SF Symbol "pencil" has the writing tip at the lower-left corner.
+        // NSCursor.hotSpot uses flipped (top-left origin) coordinates, so the
+        // bottom-left of the image is (0, size.height - 1).
+        let hotspot = NSPoint(x: 1, y: size.height - 2)
+        return NSCursor(image: composite, hotSpot: hotspot)
+    }()
+
     init(frame: NSRect, state: DrawingState) {
         self.state = state
         super.init(frame: frame)
@@ -35,6 +72,10 @@ final class DrawingCanvas: NSView {
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { false }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: Self.drawingCursor)
+    }
 
     // MARK: - Drawing
 

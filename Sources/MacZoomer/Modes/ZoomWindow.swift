@@ -8,12 +8,16 @@ final class ZoomWindow: NSWindow {
 
     init(screen: NSScreen) {
         self.zoomView = ZoomView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        // We use the 4-argument super.init *and* setFrame(_:display:) below to
+        // avoid AppKit's internal re-dispatch of `init(...:screen:)` through
+        // `[self initWithContentRect:styleMask:backing:defer:]` — that
+        // re-dispatch invokes the 4-arg override again and reassigns
+        // `zoomView`, silently dropping the one we just stored.
         super.init(
             contentRect: screen.frame,
             styleMask: .borderless,
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
         isOpaque = false
         backgroundColor = .black
@@ -25,6 +29,25 @@ final class ZoomWindow: NSWindow {
         isReleasedWhenClosed = false
         animationBehavior = .none
         contentView = zoomView
+        setFrame(screen.frame, display: false)
+    }
+
+    /// Safety override so the inherited initializer isn't a synthesized fatal
+    /// trap if anything (NIB loading, KVC, internal AppKit recreation) ever
+    /// calls it directly. Our own `init(screen:)` no longer triggers this path.
+    override init(
+        contentRect: NSRect,
+        styleMask style: NSWindow.StyleMask,
+        backing backingStoreType: NSWindow.BackingStoreType,
+        defer flag: Bool
+    ) {
+        self.zoomView = ZoomView(frame: NSRect(origin: .zero, size: contentRect.size))
+        super.init(
+            contentRect: contentRect,
+            styleMask: style,
+            backing: backingStoreType,
+            defer: flag
+        )
     }
 
     override var canBecomeKey: Bool { true }
