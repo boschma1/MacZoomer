@@ -350,8 +350,8 @@ struct AboutSettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Link("github.com/markusbosch/MacZoomer",
-                 destination: URL(string: "https://github.com/markusbosch/MacZoomer")!)
+            Link("github.com/boschma1/MacZoomer",
+                 destination: URL(string: "https://github.com/boschma1/MacZoomer")!)
                 .padding(.top, 8)
         }
         .padding()
