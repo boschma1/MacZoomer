@@ -65,17 +65,17 @@ enum ImageFileWriter {
         }
     }
 
-    static func uniqueFileURL(in folder: URL, baseName: String? = nil) -> URL {
+    static func uniqueFileURL(in folder: URL, baseName: String? = nil, ext: String = "png") -> URL {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
         let stamp = formatter.string(from: Date())
         let core = baseName ?? "MacZoomer Screenshot \(stamp)"
 
-        var candidate = folder.appendingPathComponent("\(core).png")
+        var candidate = folder.appendingPathComponent("\(core).\(ext)")
         var suffix = 2
         while FileManager.default.fileExists(atPath: candidate.path) {
-            candidate = folder.appendingPathComponent("\(core) (\(suffix)).png")
+            candidate = folder.appendingPathComponent("\(core) (\(suffix)).\(ext)")
             suffix += 1
         }
         return candidate

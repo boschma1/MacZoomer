@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var liveZoomMode = LiveZoomMode(preferences: preferences, permissions: permissions)
     lazy var drawingMode = DrawingMode()
     lazy var screenshotMode = ScreenshotMode(preferences: preferences, permissions: permissions)
+    lazy var recordingMode = RecordingMode(preferences: preferences, permissions: permissions)
     lazy var breakTimerMode = BreakTimerMode(preferences: preferences)
 
     private var menuBarController: MenuBarController?
@@ -122,6 +123,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screenshotMode.saveFullScreenToFile()
         case .snapshotRegionFile:
             screenshotMode.saveRegionToFile()
+        case .record:
+            recordingMode.toggleFullScreen()
+        case .recordRegion:
+            recordingMode.toggleRegion()
+        case .recordWindow:
+            recordingMode.toggleWindow()
+        case .convertLastRecordingToGIF:
+            recordingMode.convertLastRecordingToGIF()
         default:
             // Other actions land in later phases.
             break
@@ -146,14 +155,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showOnboarding() {
-        if onboardingWindowController == nil {
-            onboardingWindowController = OnboardingWindowController(
-                preferences: preferences,
-                permissions: permissions
-            )
-        }
+        // Always rebuild the controller. Reusing one after `close()` is
+        // fragile (the window stays alive thanks to `isReleasedWhenClosed =
+        // false` but Cocoa sometimes won't re-show it cleanly from the same
+        // instance, which manifests as the "nothing happens when I click
+        // Show Welcome Window" symptom).
+        onboardingWindowController = OnboardingWindowController(
+            preferences: preferences,
+            permissions: permissions
+        )
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        if #available(macOS 14.0, *) {
+            NSApp.activate()
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
         onboardingWindowController?.show()
     }
 

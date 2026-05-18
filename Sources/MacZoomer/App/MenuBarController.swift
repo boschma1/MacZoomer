@@ -88,6 +88,21 @@ final class MenuBarController {
             shortcut: preferences.binding(for: .record),
             action: #selector(triggerRecord)
         ))
+        menu.addItem(makeItem(
+            title: "Record Region…",
+            shortcut: preferences.binding(for: .recordRegion),
+            action: #selector(triggerRecordRegion)
+        ))
+        menu.addItem(makeItem(
+            title: "Record Window…",
+            shortcut: preferences.binding(for: .recordWindow),
+            action: #selector(triggerRecordWindow)
+        ))
+        menu.addItem(makeItem(
+            title: "Convert Last Recording to GIF…",
+            shortcut: preferences.binding(for: .convertLastRecordingToGIF),
+            action: #selector(triggerConvertLastRecordingToGIF)
+        ))
 
         menu.addItem(.separator())
 
@@ -163,7 +178,10 @@ final class MenuBarController {
     @objc private func triggerLiveZoom()  { dispatchAction(.liveZoom) }
     @objc private func triggerDraw()      { dispatchAction(.draw) }
     @objc private func triggerBreak()     { dispatchAction(.breakTimer) }
-    @objc private func triggerRecord()    { notImplemented("Record") }
+    @objc private func triggerRecord()    { dispatchAction(.record) }
+    @objc private func triggerRecordRegion() { dispatchAction(.recordRegion) }
+    @objc private func triggerRecordWindow() { dispatchAction(.recordWindow) }
+    @objc private func triggerConvertLastRecordingToGIF() { dispatchAction(.convertLastRecordingToGIF) }
     @objc private func triggerCopyScreenshot() { dispatchAction(.snapshotClipboard) }
     @objc private func triggerCopyRegion()     { dispatchAction(.snapshotRegionClipboard) }
     @objc private func triggerSaveScreenshot() { dispatchAction(.snapshotFile) }

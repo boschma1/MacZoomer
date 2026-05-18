@@ -55,6 +55,28 @@ public final class Preferences: ObservableObject {
         }
     }
 
+    @PreferenceStorage("recording.folderPath", default: "")
+    private var recordingFolderPathRaw: String
+    public var recordingFolder: URL {
+        get {
+            if !recordingFolderPathRaw.isEmpty {
+                return URL(fileURLWithPath: recordingFolderPathRaw)
+            }
+            return FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Movies")
+        }
+        set {
+            recordingFolderPathRaw = newValue.path
+            objectWillChange.send()
+        }
+    }
+
+    @PreferenceStorage("recording.frameRate", default: 30)
+    public var recordingFrameRate: Int
+
+    @PreferenceStorage("recording.showsCursor", default: true)
+    public var recordingShowsCursor: Bool
+
     @PreferenceStorage("onboarding.didComplete", default: false)
     public var didCompleteOnboarding: Bool
 

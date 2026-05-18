@@ -50,6 +50,12 @@ final class SettingsTabViewController: NSTabViewController {
             view: ScreenshotsSettingsView()
         )
         addTab(
+            label: "Recording",
+            image: NSImage(systemSymbolName: "record.circle",
+                           accessibilityDescription: "Recording")!,
+            view: RecordingSettingsView()
+        )
+        addTab(
             label: "Hotkeys",
             image: NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Hotkeys")!,
             view: HotkeysSettingsView()

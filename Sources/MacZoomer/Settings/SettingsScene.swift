@@ -131,6 +131,83 @@ struct ScreenshotsSettingsView: View {
     }
 }
 
+struct RecordingSettingsView: View {
+    @EnvironmentObject private var preferences: Preferences
+
+    var body: some View {
+        Form {
+            Section("Save location") {
+                HStack {
+                    Text(preferences.recordingFolder.path)
+                        .font(.callout.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Choose…") { chooseFolder() }
+                    Button("Reveal") {
+                        NSWorkspace.shared.activateFileViewerSelecting([preferences.recordingFolder])
+                    }
+                }
+                Text("MP4 recordings save here with auto-incremented names. Default is ~/Movies.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Capture") {
+                Picker("Format", selection: Binding(
+                    get: { preferences.recordFormat },
+                    set: { preferences.recordFormat = $0 }
+                )) {
+                    Text("MP4 (H.264)").tag(RecordingFormat.mp4)
+                    Text("GIF — coming in v1.1").tag(RecordingFormat.gif)
+                }
+                .pickerStyle(.menu)
+
+                Picker("Frame rate", selection: Binding(
+                    get: { preferences.recordingFrameRate },
+                    set: { preferences.recordingFrameRate = $0 }
+                )) {
+                    Text("24 fps").tag(24)
+                    Text("30 fps").tag(30)
+                    Text("60 fps").tag(60)
+                }
+                .pickerStyle(.segmented)
+
+                Toggle("Include mouse cursor", isOn: Binding(
+                    get: { preferences.recordingShowsCursor },
+                    set: { preferences.recordingShowsCursor = $0 }
+                ))
+
+                Text("Audio recording will arrive in v1.1.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Shortcuts") {
+                Text("Record Screen: \(preferences.binding(for: .record)?.displayString ?? "—")")
+                Text("Record Region: \(preferences.binding(for: .recordRegion)?.displayString ?? "—")")
+                Text("Record Window: \(preferences.binding(for: .recordWindow)?.displayString ?? "—")")
+            }
+            .font(.callout)
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose recording folder"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = preferences.recordingFolder
+        if panel.runModal() == .OK, let url = panel.url {
+            preferences.recordingFolder = url
+        }
+    }
+}
+
 struct BreakTimerSettingsView: View {
     @EnvironmentObject private var preferences: Preferences
 
@@ -354,11 +431,6 @@ struct AboutSettingsView: View {
             Link("github.com/boschma1/MacZoomer",
                  destination: URL(string: "https://github.com/boschma1/MacZoomer")!)
                 .padding(.top, 8)
-
-            Button("Show Welcome Window") {
-                (NSApp.delegate as? AppDelegate)?.showOnboarding()
-            }
-            .padding(.top, 12)
         }
         .padding()
     }

@@ -43,7 +43,10 @@ final class OnboardingWindowController: NSWindowController {
 
     func show() {
         guard let window else { return }
-        if !window.isVisible { window.center() }
+        if !window.isVisible {
+            window.center()
+        }
+        showWindow(nil)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
     }
