@@ -55,6 +55,9 @@ final class MenuBarController {
         )
         image?.isTemplate = true
         button.image = image
+        button.toolTip = "MacZoomer — screen zoom, drawing & screenshots"
+        button.setAccessibilityLabel("MacZoomer")
+        button.setAccessibilityRoleDescription("Menu bar item")
     }
 
     private func rebuildMenu() {

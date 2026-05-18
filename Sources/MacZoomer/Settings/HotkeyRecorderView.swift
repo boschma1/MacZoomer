@@ -46,6 +46,7 @@ struct HotkeyRecorderView: View {
             }
             .buttonStyle(.borderless)
             .help("Reset to default")
+            .accessibilityLabel("Reset \(action.displayName) shortcut to default")
             .disabled(preferences.effectiveBindings()[action] == DefaultHotkeys.bindings[action]
                       && !hasOverride)
 

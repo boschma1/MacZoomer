@@ -1,0 +1,81 @@
+name: Bug report
+description: Something doesn't work the way it should.
+title: "[Bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! Please fill in as much detail as you can — it makes triage much faster.
+  - type: input
+    id: maczoomer-version
+    attributes:
+      label: MacZoomer version
+      description: From Settings → About, or `mdls -name kMDItemVersion /Applications/MacZoomer.app`.
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: e.g. 14.5 (Sonoma), 15.0 (Sequoia)
+      placeholder: 14.5
+    validations:
+      required: true
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Hardware
+      options:
+        - Apple Silicon (M1/M2/M3/M4/…)
+        - Intel
+    validations:
+      required: true
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Which feature?
+      options:
+        - Zoom
+        - Live Zoom
+        - Drawing / Annotation
+        - Break Timer
+        - Screenshots
+        - Recording
+        - Settings / Hotkeys
+        - Menu bar / general
+        - Permissions
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Settings → …
+        2. Press ⌘1
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / crash reports
+      description: |
+        Run `log show --predicate 'subsystem == "com.markusbosch.MacZoomer"' --last 5m` and paste relevant output.
+        Crash reports live in `~/Library/Logs/DiagnosticReports/`.
+      render: shell

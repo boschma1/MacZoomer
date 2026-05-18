@@ -55,6 +55,9 @@ public final class Preferences: ObservableObject {
         }
     }
 
+    @PreferenceStorage("onboarding.didComplete", default: false)
+    public var didCompleteOnboarding: Bool
+
     // MARK: - Hotkeys
 
     private static let hotkeysKey = "hotkeys.bindings.v1"

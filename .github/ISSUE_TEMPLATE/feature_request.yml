@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a new feature or an improvement.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        MacZoomer's scope is "presenter-focused": features that help while live-demoing or recording a screencast. Suggestions outside that scope are still welcome, but please flag them.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation where MacZoomer falls short today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: in-scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This is presenter / demo / screen-recording related (in scope for v1.x).
+        - label: This is something else (will be triaged for a possible v2+ roadmap).

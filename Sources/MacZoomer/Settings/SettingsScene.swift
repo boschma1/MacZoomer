@@ -340,6 +340,7 @@ struct AboutSettingsView: View {
         VStack(spacing: 8) {
             Image(systemName: "plus.magnifyingglass")
                 .font(.system(size: 48))
+                .accessibilityHidden(true)
             Text("MacZoomer").font(.title).bold()
             Text("Version \(Bundle.main.shortVersionString)")
                 .foregroundStyle(.secondary)
@@ -353,6 +354,11 @@ struct AboutSettingsView: View {
             Link("github.com/boschma1/MacZoomer",
                  destination: URL(string: "https://github.com/boschma1/MacZoomer")!)
                 .padding(.top, 8)
+
+            Button("Show Welcome Window") {
+                (NSApp.delegate as? AppDelegate)?.showOnboarding()
+            }
+            .padding(.top, 12)
         }
         .padding()
     }

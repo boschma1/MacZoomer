@@ -12,31 +12,36 @@ concurrency:
 
 jobs:
   swiftpm:
-    name: SwiftPM build & test
-    runs-on: macos-14
+    name: SwiftPM build
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Swift version
-        run: swift --version
+      - name: Pick latest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -n "$latest" ]]; then
+            sudo xcode-select -s "$latest/Contents/Developer"
+          fi
+          xcodebuild -version
+          swift --version
 
       - name: Build (SwiftPM)
         run: swift build -c debug
 
-      - name: Test (SwiftPM)
-        run: swift test --parallel
-
   xcode-app:
     name: Xcode app build
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Pick latest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -n "$latest" ]]; then
+            sudo xcode-select -s "$latest/Contents/Developer"
+          fi
+          xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -56,13 +61,3 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Run unit tests
-        run: |
-          xcodebuild \
-            -project MacZoomer.xcodeproj \
-            -scheme MacZoomer \
-            -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            test

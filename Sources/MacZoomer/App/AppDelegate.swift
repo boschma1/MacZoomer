@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var menuBarController: MenuBarController?
     private var settingsWindowController: SettingsWindowController?
+    private var onboardingWindowController: OnboardingWindowController?
     private var settingsObserver: NSObjectProtocol?
 
     nonisolated override init() {
@@ -40,6 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.dispatch(action: action)
         }
         hotkeys.registerAll()
+
+        if !preferences.didCompleteOnboarding {
+            showOnboarding()
+        }
 
         settingsObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -140,11 +145,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindowController?.show()
     }
 
+    func showOnboarding() {
+        if onboardingWindowController == nil {
+            onboardingWindowController = OnboardingWindowController(
+                preferences: preferences,
+                permissions: permissions
+            )
+        }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        onboardingWindowController?.show()
+    }
+
     private static func isSettingsWindow(_ window: NSWindow) -> Bool {
         let title = window.title.lowercased()
-        if title.contains("settings") || title.contains("preferences") { return true }
+        if title.contains("settings") || title.contains("preferences") || title.contains("welcome") { return true }
         if let identifier = window.identifier?.rawValue.lowercased(),
-           identifier.contains("settings") || identifier.contains("preferences") {
+           identifier.contains("settings") || identifier.contains("preferences") || identifier.contains("onboarding") {
             return true
         }
         return false

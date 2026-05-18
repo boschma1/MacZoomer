@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build & publish
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"     >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Pick latest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -n "$latest" ]]; then
+            sudo xcode-select -s "$latest/Contents/Developer"
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build Release (ad-hoc signed)
+        run: |
+          xcodebuild \
+            -project MacZoomer.xcodeproj \
+            -scheme MacZoomer \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION=${{ steps.version.outputs.version }} \
+            build
+
+      - name: Re-sign with entitlements
+        run: |
+          codesign --force --deep --sign - \
+            --identifier com.markusbosch.MacZoomer \
+            --options runtime \
+            --entitlements Sources/MacZoomer/Resources/MacZoomer.entitlements \
+            build/Build/Products/Release/MacZoomer.app
+
+      - name: Verify signature
+        run: |
+          codesign -dv --verbose=4 build/Build/Products/Release/MacZoomer.app || true
+          spctl --assess --type execute --verbose build/Build/Products/Release/MacZoomer.app || true
+
+      - name: Build DMG
+        run: |
+          mkdir -p artifacts
+          scripts/make-dmg.sh \
+            build/Build/Products/Release/MacZoomer.app \
+            artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg \
+            "MacZoomer ${{ steps.version.outputs.version }}"
+
+      - name: Generate SHA-256 sums
+        run: |
+          cd artifacts
+          shasum -a 256 *.dmg | tee SHA256SUMS.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacZoomer-${{ steps.version.outputs.version }}
+          path: |
+            artifacts/*.dmg
+            artifacts/SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: MacZoomer ${{ steps.version.outputs.tag }}
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg
+            artifacts/SHA256SUMS.txt
+          body: |
+            ## MacZoomer ${{ steps.version.outputs.tag }}
+
+            > ⚠️ This build is **ad-hoc signed only** (no Developer ID yet).
+            > macOS Gatekeeper will refuse to open it directly. After downloading:
+            >
+            > 1. Move `MacZoomer.app` to `/Applications`.
+            > 2. **Right-click → Open**, then click **Open** in the warning dialog.
+            > 3. Subsequent launches work normally.
+            >
+            > Notarized DMGs and a Homebrew Cask are tracked in [Phase 8 of the roadmap](https://github.com/boschma1/MacZoomer).
+
+            ### SHA-256
+            ```
+            $(cat artifacts/SHA256SUMS.txt)
+            ```
