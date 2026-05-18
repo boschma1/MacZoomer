@@ -29,6 +29,9 @@ public final class Preferences: ObservableObject {
     @PreferenceStorage("break.opacity", default: 1.0)
     public var breakOpacity: Double
 
+    @PreferenceStorage("break.message", default: "Be right back")
+    public var breakMessage: String
+
     @PreferenceStorage("record.format", default: RecordingFormat.mp4.rawValue)
     private var recordFormatRaw: String
     public var recordFormat: RecordingFormat {

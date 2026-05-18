@@ -1,27 +1,9 @@
 import SwiftUI
 
-struct SettingsScene: View {
-    @EnvironmentObject private var preferences: Preferences
-    @EnvironmentObject private var permissions: PermissionCoordinator
-    @EnvironmentObject private var hotkeys: HotkeyManager
-
-    var body: some View {
-        TabView {
-            GeneralSettingsView()
-                .tabItem { Label("General", systemImage: "gear") }
-
-            HotkeysSettingsView()
-                .tabItem { Label("Hotkeys", systemImage: "keyboard") }
-
-            PermissionsSettingsView()
-                .tabItem { Label("Permissions", systemImage: "lock.shield") }
-
-            AboutSettingsView()
-                .tabItem { Label("About", systemImage: "info.circle") }
-        }
-        .frame(width: 520, height: 360)
-    }
-}
+// Settings is presented through ``SettingsTabViewController`` (AppKit's
+// NSTabViewController in `.toolbar` style) for the classic icon-over-label
+// preferences look. The individual pane views below are reused from there
+// via NSHostingController.
 
 struct GeneralSettingsView: View {
     @EnvironmentObject private var preferences: Preferences
@@ -39,13 +21,90 @@ struct GeneralSettingsView: View {
                         .frame(width: 50, alignment: .trailing)
                 }
             }
-            Section("Break Timer") {
-                Stepper(
-                    "Duration: \(preferences.breakDurationMinutes) min",
-                    value: bindingFor(\.breakDurationMinutes),
-                    in: 1...120
-                )
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func bindingFor<V>(_ keyPath: ReferenceWritableKeyPath<Preferences, V>) -> Binding<V> {
+        Binding(
+            get: { preferences[keyPath: keyPath] },
+            set: { preferences[keyPath: keyPath] = $0; preferences.objectWillChange.send() }
+        )
+    }
+}
+
+struct BreakTimerSettingsView: View {
+    @EnvironmentObject private var preferences: Preferences
+
+    private static let presets: [Int] = [1, 5, 10, 15, 20, 30, 45, 60]
+
+    var body: some View {
+        Form {
+            Section("Duration") {
+                HStack(spacing: 8) {
+                    TextField(
+                        "Minutes",
+                        value: bindingFor(\.breakDurationMinutes),
+                        formatter: Self.minuteFormatter
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    Stepper(
+                        "",
+                        value: bindingFor(\.breakDurationMinutes),
+                        in: 1...240
+                    )
+                    .labelsHidden()
+                    Text("minutes")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+
+                HStack(spacing: 6) {
+                    Text("Presets:")
+                        .foregroundStyle(.secondary)
+                    ForEach(Self.presets, id: \.self) { value in
+                        Button("\(value)m") {
+                            preferences.breakDurationMinutes = value
+                            preferences.objectWillChange.send()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .tint(preferences.breakDurationMinutes == value ? .accentColor : .secondary)
+                    }
+                }
+            }
+
+            Section("Appearance") {
+                TextField("Message", text: bindingFor(\.breakMessage))
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Text("Background opacity")
+                    Slider(value: bindingFor(\.breakOpacity), in: 0.5...1.0, step: 0.05)
+                    Text(String(format: "%.0f%%", preferences.breakOpacity * 100))
+                        .monospacedDigit()
+                        .frame(width: 50, alignment: .trailing)
+                }
+            }
+
+            Section("Behavior") {
                 Toggle("Lock workstation on start", isOn: bindingFor(\.breakLockOnStart))
+                Text("Lock workstation isn't wired up yet — coming in a later release.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Label {
+                    Text("Shortcut: \(preferences.binding(for: .breakTimer)?.displayString ?? "—")  •  In overlay: Space pause, ↑/↓ ±1 min, ←/→ ±10 s, R reset, Esc exit.")
+                        .font(.caption)
+                } icon: {
+                    Image(systemName: "info.circle")
+                }
+                .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -58,6 +117,15 @@ struct GeneralSettingsView: View {
             set: { preferences[keyPath: keyPath] = $0; preferences.objectWillChange.send() }
         )
     }
+
+    private static let minuteFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .none
+        f.minimum = 1
+        f.maximum = 240
+        f.allowsFloats = false
+        return f
+    }()
 }
 
 struct HotkeysSettingsView: View {

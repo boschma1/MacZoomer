@@ -6,11 +6,9 @@ struct MacZoomerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        Settings {
-            SettingsScene()
-                .environmentObject(appDelegate.preferences)
-                .environmentObject(appDelegate.permissions)
-                .environmentObject(appDelegate.hotkeys)
-        }
+        // Required by the `App` protocol; we never actually open this scene.
+        // The real settings window is presented by `SettingsWindowController`,
+        // and the rest of the UI is menu-bar + transient overlays.
+        Settings { EmptyView() }
     }
 }

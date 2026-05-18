@@ -9,6 +9,7 @@ final class MenuBarController {
     private let hotkeys: HotkeyManager
     private let zoomMode: ZoomMode
     private let drawingMode: DrawingMode
+    private let breakTimerMode: BreakTimerMode
     private let openSettings: () -> Void
 
     private var cancellables = Set<AnyCancellable>()
@@ -19,6 +20,7 @@ final class MenuBarController {
         hotkeys: HotkeyManager,
         zoomMode: ZoomMode,
         drawingMode: DrawingMode,
+        breakTimerMode: BreakTimerMode,
         openSettings: @escaping () -> Void
     ) {
         self.preferences = preferences
@@ -26,6 +28,7 @@ final class MenuBarController {
         self.hotkeys = hotkeys
         self.zoomMode = zoomMode
         self.drawingMode = drawingMode
+        self.breakTimerMode = breakTimerMode
         self.openSettings = openSettings
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -139,7 +142,13 @@ final class MenuBarController {
             drawingMode.activate()
         }
     }
-    @objc private func triggerBreak()     { notImplemented("Break Timer") }
+    @objc private func triggerBreak()     {
+        if breakTimerMode.isActive {
+            breakTimerMode.deactivate()
+        } else {
+            breakTimerMode.activate()
+        }
+    }
     @objc private func triggerRecord()    { notImplemented("Record") }
 
     private func notImplemented(_ feature: String) {
