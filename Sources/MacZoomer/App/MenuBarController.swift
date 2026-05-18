@@ -8,6 +8,7 @@ final class MenuBarController {
     private let permissions: PermissionCoordinator
     private let hotkeys: HotkeyManager
     private let zoomMode: ZoomMode
+    private let liveZoomMode: LiveZoomMode
     private let drawingMode: DrawingMode
     private let breakTimerMode: BreakTimerMode
     private let openSettings: () -> Void
@@ -20,6 +21,7 @@ final class MenuBarController {
         permissions: PermissionCoordinator,
         hotkeys: HotkeyManager,
         zoomMode: ZoomMode,
+        liveZoomMode: LiveZoomMode,
         drawingMode: DrawingMode,
         breakTimerMode: BreakTimerMode,
         openSettings: @escaping () -> Void,
@@ -29,6 +31,7 @@ final class MenuBarController {
         self.permissions = permissions
         self.hotkeys = hotkeys
         self.zoomMode = zoomMode
+        self.liveZoomMode = liveZoomMode
         self.drawingMode = drawingMode
         self.breakTimerMode = breakTimerMode
         self.openSettings = openSettings
@@ -131,7 +134,7 @@ final class MenuBarController {
     // MARK: - Mode placeholders (real implementations land in later phases)
 
     @objc private func triggerZoom()      { dispatchAction(.zoom) }
-    @objc private func triggerLiveZoom()  { notImplemented("Live Zoom") }
+    @objc private func triggerLiveZoom()  { dispatchAction(.liveZoom) }
     @objc private func triggerDraw()      { dispatchAction(.draw) }
     @objc private func triggerBreak()     { dispatchAction(.breakTimer) }
     @objc private func triggerRecord()    { notImplemented("Record") }

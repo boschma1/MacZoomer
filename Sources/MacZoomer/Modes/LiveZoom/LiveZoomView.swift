@@ -1,21 +1,23 @@
 import AppKit
+import AVFoundation
 import QuartzCore
 
-/// The rendering surface inside a `ZoomWindow`. Owns the captured image
-/// (as a `CALayer.contents`) and applies pan + zoom transformations as the
-/// user interacts with it.
-final class ZoomView: NSView {
-    private let imageLayer = CALayer()
+/// Live-feed counterpart to `ZoomView`. Renders `CMSampleBuffer` frames from
+/// `LiveScreenCapturer` via `AVSampleBufferDisplayLayer` and applies the same
+/// pan/zoom math (`ZoomGeometry`) as the static zoom view.
+///
+/// The display layer is the size of the (zoomed) source in destination
+/// coordinates, positioned so the desired source point sits under the
+/// requested screen point — identical to `ZoomView`'s `imageLayer.frame`.
+final class LiveZoomView: NSView {
+    private let videoLayer = AVSampleBufferDisplayLayer()
 
     private(set) var zoomLevel: CGFloat = 2.0
-    private var sourceImage: CGImage?
-    /// Size of the source image in points (i.e. pixels / backingScale).
     private var sourcePointSize: CGSize = .zero
-    /// The source point that we want anchored at `focalScreen`.
     private var focalSource: CGPoint = .zero
-    /// Where on screen the focal source point appears. Set from mouse position.
     private var focalScreen: CGPoint = .zero
 
+    /// Toggles between nearest-neighbour and linear sampling.
     var smoothing: Bool = true {
         didSet { applyMagnificationFilter() }
     }
@@ -34,14 +36,14 @@ final class ZoomView: NSView {
         wantsLayer = true
         layer = CALayer()
         layer?.backgroundColor = NSColor.black.cgColor
-        imageLayer.anchorPoint = .zero
-        imageLayer.contentsGravity = .resize
-        layer?.addSublayer(imageLayer)
+        videoLayer.anchorPoint = .zero
+        videoLayer.videoGravity = .resize
+        layer?.addSublayer(videoLayer)
         applyMagnificationFilter()
     }
 
     private func applyMagnificationFilter() {
-        imageLayer.magnificationFilter = smoothing ? .linear : .nearest
+        videoLayer.magnificationFilter = smoothing ? .linear : .nearest
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -49,29 +51,47 @@ final class ZoomView: NSView {
 
     // MARK: - Public API
 
-    func configure(image: CGImage, backingScale: CGFloat, initialZoom: CGFloat, focalScreen: CGPoint) {
-        self.sourceImage = image
-        self.sourcePointSize = CGSize(
-            width: CGFloat(image.width) / backingScale,
-            height: CGFloat(image.height) / backingScale
-        )
-        imageLayer.contents = image
-        // The focal source point at activation = the screen point under the cursor.
-        // In native (non-zoomed) coordinates, that's just the screen point itself,
-        // since at zoom 1.0 the image fills the screen 1:1.
+    /// Establish the source size and focal point. Call before frames begin
+    /// arriving so the layer is positioned correctly for the very first frame.
+    func configure(sourcePointSize: CGSize, initialZoom: CGFloat, focalScreen: CGPoint) {
+        self.sourcePointSize = sourcePointSize
         self.focalSource = focalScreen
         self.focalScreen = focalScreen
         self.zoomLevel = ZoomGeometry.clamp(level: initialZoom)
         applyLayout(animated: false)
     }
 
+    /// Enqueue the latest captured frame for display.
+    ///
+    /// Called from the SCStream output queue — `AVSampleBufferDisplayLayer`
+    /// is thread-safe so we don't need to hop to main.
+    func enqueueFrame(_ sampleBuffer: CMSampleBuffer) {
+        // Mark for immediate display so the layer doesn't hold frames in its
+        // internal queue waiting for their PTS — we want the latest frame
+        // shown as soon as possible.
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true) as NSArray?,
+           attachments.count > 0,
+           let attachment = attachments[0] as? NSMutableDictionary {
+            attachment[kCMSampleAttachmentKey_DisplayImmediately as NSString] = true
+        }
+
+        guard videoLayer.status != .failed else {
+            videoLayer.flush()
+            return
+        }
+        if videoLayer.isReadyForMoreMediaData {
+            videoLayer.enqueue(sampleBuffer)
+        }
+    }
+
     func updateFocalScreen(_ screenPoint: CGPoint) {
-        // ZoomIt-style cursor-tracking pan: the source pixel under the
-        // cursor's actual desktop position should appear at the cursor's
-        // screen position in the magnified view. Since our source is the
-        // display captured 1:1, the source pixel == the screen pixel, so
-        // we set focalSource = focalScreen and let `clampFocalSource`
-        // pull the focal back near edges to avoid black bars.
+        // ZoomIt-style cursor-tracking pan: the source pixel at the
+        // cursor's desktop position should appear at the cursor's screen
+        // position inside the magnified view. Our source is the display
+        // captured 1:1, so source pixel == screen pixel and we set
+        // focalSource = focalScreen directly. `clampFocalSource` keeps
+        // the magnified view inside the source so the screen never
+        // shows uncovered black bars near edges.
         focalScreen = screenPoint
         focalSource = ZoomGeometry.clampFocalSource(
             screenPoint,
@@ -119,10 +139,9 @@ final class ZoomView: NSView {
         CATransaction.commit()
     }
 
-    /// Render the currently displayed zoomed view to a CGImage. Used by the
-    /// Zoom→Draw handoff: the resulting bitmap becomes Draw mode's frozen
-    /// background, so annotations land on top of the zoomed-in view rather
-    /// than the original unzoomed screen capture.
+    /// Snapshot the current live-zoom view for the Live Zoom → Draw handoff.
+    /// We sample the layer-backed view via `cacheDisplay(in:to:)`, identical
+    /// to `ZoomView.renderCurrentView()`.
     func renderCurrentView() -> CGImage? {
         guard let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
         cacheDisplay(in: bounds, to: rep)
@@ -137,12 +156,12 @@ final class ZoomView: NSView {
     }
 
     private func applyLayout(animated: Bool) {
-        guard sourceImage != nil else { return }
+        guard sourcePointSize != .zero else { return }
         if !animated {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
         }
-        imageLayer.frame = ZoomGeometry.imageLayerFrame(
+        videoLayer.frame = ZoomGeometry.imageLayerFrame(
             sourcePointSize: sourcePointSize,
             zoomLevel: zoomLevel,
             focalSource: focalSource,

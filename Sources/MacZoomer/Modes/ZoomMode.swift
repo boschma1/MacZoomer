@@ -17,6 +17,7 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
     /// which is a much better experience than the system dialog reappearing
     /// on every hotkey press.
     private var hasTriggeredSystemPermissionPrompt = false
+    private var isShowingPermissionAlert = false
 
     public init(preferences: Preferences, permissions: PermissionCoordinator) {
         self.preferences = preferences
@@ -157,17 +158,26 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
     }
 
     private func presentPermissionAlert() {
+        // Re-entry guard: NSAlert.runModal() runs a nested event loop, and
+        // queued ⌘1 presses while it's open would otherwise stack alerts.
+        guard !isShowingPermissionAlert else { return }
+        isShowingPermissionAlert = true
+        defer { isShowingPermissionAlert = false }
+
         let alert = NSAlert()
         alert.messageText = "Screen Recording permission needed"
         alert.informativeText = """
             MacZoomer can't capture the screen for Zoom Mode until Screen Recording is enabled in System Settings.
 
-            After enabling it, please quit MacZoomer and relaunch — macOS only applies the new permission at process start.
+            macOS only applies a new Screen Recording grant when the app is freshly launched — so after enabling, MacZoomer must be quit and relaunched.
             """
-        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Open Settings & Quit MacZoomer")
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn {
             permissions.openSettings(for: .screenRecording)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                NSApp.terminate(nil)
+            }
         }
     }
 

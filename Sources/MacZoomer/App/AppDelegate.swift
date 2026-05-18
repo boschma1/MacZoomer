@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let permissions = PermissionCoordinator()
     lazy var hotkeys = HotkeyManager(preferences: preferences)
     lazy var zoomMode = ZoomMode(preferences: preferences, permissions: permissions)
+    lazy var liveZoomMode = LiveZoomMode(preferences: preferences, permissions: permissions)
     lazy var drawingMode = DrawingMode()
     lazy var breakTimerMode = BreakTimerMode(preferences: preferences)
 
@@ -26,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             permissions: permissions,
             hotkeys: hotkeys,
             zoomMode: zoomMode,
+            liveZoomMode: liveZoomMode,
             drawingMode: drawingMode,
             breakTimerMode: breakTimerMode,
             openSettings: { [weak self] in self?.openSettings() },
@@ -68,7 +70,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if zoomMode.isActive {
                 zoomMode.deactivate()
             } else {
+                if liveZoomMode.isActive { liveZoomMode.deactivateImmediately() }
                 zoomMode.activate()
+            }
+        case .liveZoom:
+            if liveZoomMode.isActive {
+                liveZoomMode.deactivate()
+            } else {
+                if zoomMode.isActive { zoomMode.deactivateImmediately() }
+                liveZoomMode.activate()
             }
         case .draw, .liveDraw:
             if drawingMode.isActive {
@@ -84,6 +94,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     drawingMode.activate(frozenImages: images)
                 }
+            } else if liveZoomMode.isActive {
+                // Live Zoom → Draw: stop the stream and freeze the current
+                // displayed live frame as the draw background.
+                liveZoomMode.deactivateImmediately()
+                drawingMode.activate()
             } else {
                 drawingMode.activate()
             }
