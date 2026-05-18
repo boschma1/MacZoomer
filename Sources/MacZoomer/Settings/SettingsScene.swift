@@ -9,9 +9,26 @@ struct GeneralSettingsView: View {
     @EnvironmentObject private var preferences: Preferences
 
     @State private var lastImportError: String?
+    @State private var launchAtLogin: Bool = LaunchAtLogin.isEnabled
+    @State private var launchAtLoginError: String?
 
     var body: some View {
         Form {
+            Section("Startup") {
+                Toggle("Launch MacZoomer at login", isOn: Binding(
+                    get: { launchAtLogin },
+                    set: { setLaunchAtLogin($0) }
+                ))
+                if let launchAtLoginError {
+                    Text(launchAtLoginError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                Text("MacZoomer will start automatically and appear in the menu bar when you log in. You can also manage this in System Settings → General → Login Items.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Zoom") {
                 Toggle("Animate zoom transitions", isOn: bindingFor(\.zoomAnimate))
                 Toggle("Smooth the zoomed image",  isOn: bindingFor(\.zoomSmoothing))
@@ -42,6 +59,18 @@ struct GeneralSettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear { launchAtLogin = LaunchAtLogin.isEnabled }
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LaunchAtLogin.set(enabled)
+            launchAtLogin = LaunchAtLogin.isEnabled
+            launchAtLoginError = nil
+        } catch {
+            launchAtLogin = LaunchAtLogin.isEnabled
+            launchAtLoginError = "Could not update launch-at-login: \(error.localizedDescription). If this keeps happening, toggle it from System Settings → General → Login Items."
+        }
     }
 
     private func bindingFor<V>(_ keyPath: ReferenceWritableKeyPath<Preferences, V>) -> Binding<V> {
