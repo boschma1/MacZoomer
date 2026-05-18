@@ -17,6 +17,7 @@ public final class HotkeyManager: ObservableObject {
     private var nextHotKeyID: UInt32 = 1
     private var handler: Handler?
     private var prefsCancellable: AnyCancellable?
+    private var isPaused: Bool = false
 
     /// Four-char-code 'MZmr' — Carbon expects a signature for hot key IDs.
     private static let signature: OSType = {
@@ -50,6 +51,7 @@ public final class HotkeyManager: ObservableObject {
     }
 
     public func registerAll() {
+        guard !isPaused else { return }
         unregisterAll()
         for action in HotkeyAction.allCases {
             guard let binding = preferences.binding(for: action) else { continue }
@@ -64,6 +66,20 @@ public final class HotkeyManager: ObservableObject {
         registrations.removeAll()
         hotKeyIDByAction.removeAll()
         actionByHotKeyID.removeAll()
+    }
+
+    /// Suspends global hotkey dispatch — used by the in-app hotkey recorder
+    /// so chords like ⌘1 are captured by the recorder instead of triggering
+    /// the bound action. ``resumeGlobalHotkeys()`` re-registers everything
+    /// from current preferences.
+    public func pauseGlobalHotkeys() {
+        unregisterAll()
+        isPaused = true
+    }
+
+    public func resumeGlobalHotkeys() {
+        isPaused = false
+        registerAll()
     }
 
     private func register(action: HotkeyAction, binding: HotkeyBinding) {

@@ -79,6 +79,30 @@ public final class Preferences: ObservableObject {
         objectWillChange.send()
     }
 
+    /// Bulk replacement used by settings import. Persists once and notifies once.
+    public func replaceAllHotkeyOverrides(_ overrides: [HotkeyAction: HotkeyBinding]) {
+        hotkeyOverrides = overrides
+        saveHotkeys()
+        objectWillChange.send()
+    }
+
+    /// Clears every user override so all actions revert to ``DefaultHotkeys``.
+    public func resetHotkeysToDefaults() {
+        replaceAllHotkeyOverrides([:])
+    }
+
+    /// Snapshot of the *effective* bindings (overrides + defaults filled in).
+    /// Used by the recorder UI for conflict detection.
+    public func effectiveBindings() -> [HotkeyAction: HotkeyBinding] {
+        var result: [HotkeyAction: HotkeyBinding] = [:]
+        for action in HotkeyAction.allCases {
+            if let b = binding(for: action) {
+                result[action] = b
+            }
+        }
+        return result
+    }
+
     private func loadHotkeys() {
         guard let data = UserDefaults.standard.data(forKey: Self.hotkeysKey) else { return }
         do {

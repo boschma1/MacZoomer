@@ -77,41 +77,6 @@ public struct HotkeyBinding: Codable, Hashable, Sendable {
     }
 }
 
-extension HotkeyBinding {
-    /// Returns the `keyEquivalent` string for an NSMenuItem, if representable.
-    /// We only support a small set of mappings here — the menu shortcut is
-    /// purely informational; the real registration goes through Carbon hotkeys.
-    public var menuKeyEquivalent: String {
-        Self.menuCharacters[keyCode].map(String.init) ?? ""
-    }
-
-    public var menuModifierMask: NSEvent.ModifierFlags {
-        modifiers
-    }
-
-    /// Human-readable form like "⌘1" / "⌘⌥5".
-    public var displayString: String {
-        var result = ""
-        if modifiers.contains(.control) { result += "⌃" }
-        if modifiers.contains(.option)  { result += "⌥" }
-        if modifiers.contains(.shift)   { result += "⇧" }
-        if modifiers.contains(.command) { result += "⌘" }
-        if let ch = Self.menuCharacters[keyCode] {
-            result += String(ch).uppercased()
-        } else {
-            result += "key#\(keyCode)"
-        }
-        return result
-    }
-
-    // Small mapping table — enough for the default bindings; expanded as
-    // the Phase 7 hotkey-recording UI introduces more keys.
-    private static let menuCharacters: [UInt16: Character] = [
-        18: "1", 19: "2", 20: "3", 21: "4", 23: "5",
-        22: "6", 26: "7", 28: "8", 25: "9", 29: "0"
-    ]
-}
-
 /// Default bindings, chosen to mirror ZoomIt on Windows but using ⌘ instead
 /// of Ctrl so they don't collide with macOS conventions.
 public enum DefaultHotkeys {

@@ -44,6 +44,12 @@ final class SettingsTabViewController: NSTabViewController {
             view: BreakTimerSettingsView()
         )
         addTab(
+            label: "Screenshots",
+            image: NSImage(systemSymbolName: "camera.on.rectangle",
+                           accessibilityDescription: "Screenshots")!,
+            view: ScreenshotsSettingsView()
+        )
+        addTab(
             label: "Hotkeys",
             image: NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Hotkeys")!,
             view: HotkeysSettingsView()

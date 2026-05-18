@@ -8,6 +8,8 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @EnvironmentObject private var preferences: Preferences
 
+    @State private var lastImportError: String?
+
     var body: some View {
         Form {
             Section("Zoom") {
@@ -21,6 +23,22 @@ struct GeneralSettingsView: View {
                         .frame(width: 50, alignment: .trailing)
                 }
             }
+
+            Section("Settings") {
+                HStack {
+                    Button("Import…") { runImport() }
+                    Button("Export…") { runExport() }
+                    Spacer()
+                }
+                if let lastImportError {
+                    Text(lastImportError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                Text("Export bundles every preference and customized shortcut into a JSON file. Importing replaces the current values.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()
@@ -31,6 +49,85 @@ struct GeneralSettingsView: View {
             get: { preferences[keyPath: keyPath] },
             set: { preferences[keyPath: keyPath] = $0; preferences.objectWillChange.send() }
         )
+    }
+
+    private func runExport() {
+        let panel = NSSavePanel()
+        panel.title = "Export MacZoomer Settings"
+        panel.nameFieldStringValue = "MacZoomer Settings.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try preferences.exportToData()
+            try data.write(to: url, options: .atomic)
+            lastImportError = nil
+        } catch {
+            lastImportError = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func runImport() {
+        let panel = NSOpenPanel()
+        panel.title = "Import MacZoomer Settings"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            try preferences.importFromData(data)
+            lastImportError = nil
+        } catch {
+            lastImportError = "Import failed: \(error.localizedDescription)"
+        }
+    }
+}
+
+struct ScreenshotsSettingsView: View {
+    @EnvironmentObject private var preferences: Preferences
+
+    var body: some View {
+        Form {
+            Section("Save location") {
+                HStack {
+                    Text(preferences.screenshotFolder.path)
+                        .font(.callout.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Choose…") { chooseFolder() }
+                    Button("Reveal") {
+                        NSWorkspace.shared.activateFileViewerSelecting([preferences.screenshotFolder])
+                    }
+                }
+                Text("Used by ⌘⌃6 (full screen) and ⌘⇧⌃6 (region). PNG files land in this folder with auto-incremented names if a file already exists.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Shortcuts") {
+                Text("Copy Screenshot: \(preferences.binding(for: .snapshotClipboard)?.displayString ?? "—")")
+                Text("Copy Region: \(preferences.binding(for: .snapshotRegionClipboard)?.displayString ?? "—")")
+                Text("Save Screenshot: \(preferences.binding(for: .snapshotFile)?.displayString ?? "—")")
+                Text("Save Region: \(preferences.binding(for: .snapshotRegionFile)?.displayString ?? "—")")
+            }
+            .font(.callout)
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose screenshot folder"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = preferences.screenshotFolder
+        if panel.runModal() == .OK, let url = panel.url {
+            preferences.screenshotFolder = url
+        }
     }
 }
 
@@ -131,24 +228,49 @@ struct BreakTimerSettingsView: View {
 struct HotkeysSettingsView: View {
     @EnvironmentObject private var preferences: Preferences
 
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("Default bindings shown below. A hotkey-recorder UI ships in Phase 7.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 8)
+    @State private var showResetConfirmation = false
 
-            Table(HotkeyAction.allCases) {
-                TableColumn("Action") { (action: HotkeyAction) in
-                    Text(action.displayName)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Click a shortcut to record. Press the new combination, or Esc to cancel / Delete to clear.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Reset All to Defaults") {
+                    showResetConfirmation = true
                 }
-                TableColumn("Shortcut") { (action: HotkeyAction) in
-                    Text(preferences.binding(for: action)?.displayString ?? "—")
-                        .monospaced()
+                .controlSize(.small)
+            }
+            .padding(.bottom, 4)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(HotkeyAction.allCases) { action in
+                        HStack {
+                            Text(action.displayName)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HotkeyRecorderView(action: action)
+                        }
+                        .padding(.vertical, 4)
+                        Divider()
+                    }
                 }
             }
         }
         .padding()
+        .confirmationDialog(
+            "Reset all shortcuts to their defaults?",
+            isPresented: $showResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive) {
+                preferences.resetHotkeysToDefaults()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This undoes every customized shortcut. Other settings are untouched.")
+        }
     }
 }
 
@@ -224,6 +346,10 @@ struct AboutSettingsView: View {
             Text("Screen-zoom, annotation, and recording for macOS.")
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
+            Text("A Mac clone of Sysinternals' ZoomIt.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             Link("github.com/markusbosch/MacZoomer",
                  destination: URL(string: "https://github.com/markusbosch/MacZoomer")!)
                 .padding(.top, 8)
