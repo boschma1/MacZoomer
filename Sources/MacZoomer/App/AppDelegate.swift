@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var zoomMode = ZoomMode(preferences: preferences, permissions: permissions)
     lazy var liveZoomMode = LiveZoomMode(preferences: preferences, permissions: permissions)
     lazy var drawingMode = DrawingMode()
+    lazy var screenshotMode = ScreenshotMode(preferences: preferences, permissions: permissions)
     lazy var breakTimerMode = BreakTimerMode(preferences: preferences)
 
     private var menuBarController: MenuBarController?
@@ -108,6 +109,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 breakTimerMode.activate()
             }
+        case .snapshotClipboard:
+            screenshotMode.copyFullScreenToClipboard()
+        case .snapshotRegionClipboard:
+            screenshotMode.copyRegionToClipboard()
+        case .snapshotFile:
+            screenshotMode.saveFullScreenToFile()
+        case .snapshotRegionFile:
+            screenshotMode.saveRegionToFile()
         default:
             // Other actions land in later phases.
             break

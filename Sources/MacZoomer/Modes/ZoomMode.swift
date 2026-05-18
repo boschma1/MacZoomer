@@ -146,13 +146,13 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
     }
 
     private func handlePermissionDenied() {
-        // The first time we see "denied", trigger the system prompt so a TCC
-        // entry is registered for the app (otherwise the user has nothing to
-        // toggle in System Settings → Privacy & Security → Screen Recording).
-        // On subsequent denials we just show our own alert.
+        // On first denial, trigger only the system prompt — stacking our
+        // own alert on top of it was confusing. If permission is still
+        // not granted by the next hotkey press, surface our alert.
         if !hasTriggeredSystemPermissionPrompt {
             hasTriggeredSystemPermissionPrompt = true
             permissions.requestIfNeeded(.screenRecording)
+            return
         }
         presentPermissionAlert()
     }
@@ -169,15 +169,12 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
         alert.informativeText = """
             MacZoomer can't capture the screen for Zoom Mode until Screen Recording is enabled in System Settings.
 
-            macOS only applies a new Screen Recording grant when the app is freshly launched — so after enabling, MacZoomer must be quit and relaunched.
+            After enabling it, please quit MacZoomer from the menu bar and relaunch — macOS only applies a new Screen Recording grant when the app is freshly launched.
             """
-        alert.addButton(withTitle: "Open Settings & Quit MacZoomer")
+        alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn {
             permissions.openSettings(for: .screenRecording)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                NSApp.terminate(nil)
-            }
         }
     }
 

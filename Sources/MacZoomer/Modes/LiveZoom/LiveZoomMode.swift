@@ -211,9 +211,13 @@ public final class LiveZoomMode: NSObject, ObservableObject, @MainActor LiveZoom
     }
 
     private func handlePermissionDenied() {
+        // On first denial, only trigger the system Screen Recording
+        // prompt; stacking our own alert on top simultaneously was
+        // confusing. Surface our alert only on subsequent denials.
         if !hasTriggeredSystemPermissionPrompt {
             hasTriggeredSystemPermissionPrompt = true
             permissions.requestIfNeeded(.screenRecording)
+            return
         }
         presentPermissionAlert()
     }
@@ -231,17 +235,12 @@ public final class LiveZoomMode: NSObject, ObservableObject, @MainActor LiveZoom
         alert.informativeText = """
             MacZoomer can't capture the screen for Live Zoom until Screen Recording is enabled in System Settings.
 
-            macOS only applies a new Screen Recording grant when the app is freshly launched — so after enabling, MacZoomer must be quit and relaunched.
+            After enabling it, please quit MacZoomer from the menu bar and relaunch — macOS only applies a new Screen Recording grant when the app is freshly launched.
             """
-        alert.addButton(withTitle: "Open Settings & Quit MacZoomer")
+        alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn {
             permissions.openSettings(for: .screenRecording)
-            // Give Finder/System Settings a moment to come forward before we
-            // terminate, so the user sees the pane open as we exit.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                NSApp.terminate(nil)
-            }
         }
     }
 

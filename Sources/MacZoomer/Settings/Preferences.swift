@@ -39,6 +39,22 @@ public final class Preferences: ObservableObject {
         set { recordFormatRaw = newValue.rawValue }
     }
 
+    @PreferenceStorage("screenshot.folderPath", default: "")
+    private var screenshotFolderPathRaw: String
+    public var screenshotFolder: URL {
+        get {
+            if !screenshotFolderPathRaw.isEmpty {
+                return URL(fileURLWithPath: screenshotFolderPathRaw)
+            }
+            return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Desktop")
+        }
+        set {
+            screenshotFolderPathRaw = newValue.path
+            objectWillChange.send()
+        }
+    }
+
     // MARK: - Hotkeys
 
     private static let hotkeysKey = "hotkeys.bindings.v1"

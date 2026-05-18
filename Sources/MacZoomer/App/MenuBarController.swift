@@ -88,6 +88,29 @@ final class MenuBarController {
 
         menu.addItem(.separator())
 
+        menu.addItem(makeItem(
+            title: "Copy Screenshot",
+            shortcut: preferences.binding(for: .snapshotClipboard),
+            action: #selector(triggerCopyScreenshot)
+        ))
+        menu.addItem(makeItem(
+            title: "Copy Region",
+            shortcut: preferences.binding(for: .snapshotRegionClipboard),
+            action: #selector(triggerCopyRegion)
+        ))
+        menu.addItem(makeItem(
+            title: "Save Screenshot…",
+            shortcut: preferences.binding(for: .snapshotFile),
+            action: #selector(triggerSaveScreenshot)
+        ))
+        menu.addItem(makeItem(
+            title: "Save Region…",
+            shortcut: preferences.binding(for: .snapshotRegionFile),
+            action: #selector(triggerSaveRegion)
+        ))
+
+        menu.addItem(.separator())
+
         if !permissions.allGranted {
             let item = NSMenuItem(
                 title: "⚠ Permissions needed…",
@@ -138,6 +161,10 @@ final class MenuBarController {
     @objc private func triggerDraw()      { dispatchAction(.draw) }
     @objc private func triggerBreak()     { dispatchAction(.breakTimer) }
     @objc private func triggerRecord()    { notImplemented("Record") }
+    @objc private func triggerCopyScreenshot() { dispatchAction(.snapshotClipboard) }
+    @objc private func triggerCopyRegion()     { dispatchAction(.snapshotRegionClipboard) }
+    @objc private func triggerSaveScreenshot() { dispatchAction(.snapshotFile) }
+    @objc private func triggerSaveRegion()     { dispatchAction(.snapshotRegionFile) }
 
     private func notImplemented(_ feature: String) {
         let alert = NSAlert()
