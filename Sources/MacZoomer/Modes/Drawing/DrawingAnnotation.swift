@@ -8,7 +8,7 @@ public enum DrawingAnnotation: Sendable {
     case rectangle(StraightShape)
     case ellipse(StraightShape)
     case arrow(StraightShape)
-    case blur(BlurStroke)
+    case blur(BlurArea)
     case text(TextStamp)
 
     public var style: PenStyle? {
@@ -46,16 +46,18 @@ public struct StraightShape: Sendable {
     }
 }
 
-/// A blur-pen stroke. Has only a width (the brush thickness) and a path; the
-/// canvas renders it by drawing a Gaussian-blurred copy of the frozen
-/// background clipped to the path's stroke.
-public struct BlurStroke: Sendable {
-    public let width: CGFloat
-    public var points: [CGPoint]
+/// A blur-rect region. Stores the user-selected rectangle (in canvas
+/// coordinates) and the canvas renders it by drawing a Gaussian-blurred copy
+/// of the frozen background clipped to that rect.
+///
+/// Replaces the older freehand `BlurStroke`: click-and-drag to pick the area
+/// to blur. This matches how most screenshot/redaction tools (CleanShot,
+/// Skitch) work and produces more predictable redactions than a brush.
+public struct BlurArea: Sendable, Equatable {
+    public var rect: CGRect
 
-    public init(width: CGFloat, points: [CGPoint] = []) {
-        self.width = width
-        self.points = points
+    public init(rect: CGRect) {
+        self.rect = rect
     }
 }
 

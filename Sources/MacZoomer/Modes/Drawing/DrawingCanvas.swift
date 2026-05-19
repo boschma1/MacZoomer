@@ -19,8 +19,8 @@ final class DrawingCanvas: NSView {
     /// In-progress freehand stroke / shape (ink tool).
     private var inProgressInk: DrawingAnnotation?
 
-    /// In-progress blur stroke.
-    private var inProgressBlur: BlurStroke?
+    /// In-progress blur rect (being click-and-dragged).
+    private var inProgressBlur: BlurArea?
 
     /// The shape constraint chosen at mouseDown for ink strokes.
     private var activeConstraint: ShapeConstraint = .freehand
@@ -135,7 +135,7 @@ final class DrawingCanvas: NSView {
             renderAnnotation(ink, in: context)
         }
         if let blur = inProgressBlur {
-            renderBlurStroke(blur, in: context)
+            renderBlurArea(blur, in: context, showOutline: true)
         }
         if let draft = state.inProgressText {
             renderTextDraft(draft, in: context)
@@ -144,8 +144,8 @@ final class DrawingCanvas: NSView {
 
     private func renderAnnotation(_ annotation: DrawingAnnotation, in context: CGContext) {
         switch annotation {
-        case .blur(let stroke):
-            renderBlurStroke(stroke, in: context)
+        case .blur(let area):
+            renderBlurArea(area, in: context, showOutline: false)
             return
         case .text(let stamp):
             renderTextStamp(stamp, caretVisible: false, isCommitted: true)
@@ -203,41 +203,38 @@ final class DrawingCanvas: NSView {
         }
     }
 
-    private func renderBlurStroke(_ stroke: BlurStroke, in context: CGContext) {
-        guard stroke.points.count >= 1 else { return }
-        let path = NSBezierPath()
-        let width = max(stroke.width, 8)
-        path.lineWidth = width
-        path.lineCapStyle = .round
-        path.lineJoinStyle = .round
-        if let first = stroke.points.first {
-            path.move(to: first)
-            for point in stroke.points.dropFirst() {
-                path.line(to: point)
-            }
-        }
-        let cg = path.cgPath
-        let stroked = cg.copy(
-            strokingWithWidth: width,
-            lineCap: .round,
-            lineJoin: .round,
-            miterLimit: 10
-        )
+    private func renderBlurArea(_ area: BlurArea, in context: CGContext, showOutline: Bool) {
+        let rect = area.rect.standardized
+        guard rect.width > 0 && rect.height > 0 else { return }
 
         context.saveGState()
         defer { context.restoreGState() }
-        context.addPath(stroked)
+        context.addRect(rect)
         context.clip()
 
         if let blurred = ensureBlurredBackground() {
-            // Proper gaussian blur of the frozen-screen background.
+            // Proper gaussian blur of the frozen-screen background, clipped
+            // to the user-selected rectangle.
             context.draw(blurred, in: bounds)
         } else {
             // No frozen background (screen-recording denied, or live-draw
             // overlay) — fall back to an opaque redaction so the blur tool
             // is still useful as a privacy mask.
             context.setFillColor(NSColor.black.withAlphaComponent(0.92).cgColor)
-            context.fill(bounds)
+            context.fill(rect)
+        }
+
+        if showOutline {
+            // Thin dashed outline during the drag so the selection is clear
+            // even when the underlying area is busy. `clip()` above limits
+            // drawing to the rect interior, so we need a fresh state to draw
+            // the outline on top.
+            context.restoreGState()
+            context.saveGState()
+            context.setStrokeColor(NSColor.white.withAlphaComponent(0.95).cgColor)
+            context.setLineWidth(1.0)
+            context.setLineDash(phase: 0, lengths: [4, 3])
+            context.stroke(rect)
         }
     }
 
@@ -336,7 +333,10 @@ final class DrawingCanvas: NSView {
             return
 
         case .blur:
-            inProgressBlur = BlurStroke(width: max(state.currentWidth * 3, 20), points: [point])
+            // Click-and-drag selects a rectangular area to blur. We
+            // initialize both corners at the click point and update the
+            // opposite corner on drag.
+            inProgressBlur = BlurArea(rect: CGRect(origin: point, size: .zero))
 
         case .ink:
             activeConstraint = ShapeConstraint.from(modifiers: event.modifierFlags)
@@ -363,7 +363,9 @@ final class DrawingCanvas: NSView {
         case .text:
             return // Drag in text mode is a no-op
         case .blur:
-            inProgressBlur?.points.append(point)
+            // Drag updates the rect from the original press location
+            // (`dragStart`) to the current cursor.
+            inProgressBlur?.rect = DrawingGeometry.rect(from: dragStart, to: point)
         case .ink:
             switch (activeConstraint, inProgressInk) {
             case (.freehand, .freehand(var stroke)):
@@ -393,8 +395,12 @@ final class DrawingCanvas: NSView {
         case .text:
             break
         case .blur:
-            if let stroke = inProgressBlur, stroke.points.count > 1 {
-                state.commit(.blur(stroke))
+            // Commit only if the user actually dragged out a non-degenerate
+            // rectangle; a stray click shouldn't leave a 1px blur artifact.
+            if let area = inProgressBlur,
+               area.rect.width >= 2,
+               area.rect.height >= 2 {
+                state.commit(.blur(area))
             }
             inProgressBlur = nil
         case .ink:
@@ -483,10 +489,16 @@ final class DrawingCanvas: NSView {
         // Color shortcuts: R G B Y O P (Shift variant = highlight).
         // `B` is normally consumed by the blur-tool shortcut above; Shift+B
         // still routes here so the user can pick highlight-blue.
+        //
+        // We also force-switch back to `.ink` here so that pressing a color
+        // key while the Blur tool is active gives visible feedback — without
+        // this, the color is updated silently but the blur tool ignores it,
+        // which previously left users stuck in Blur after pressing `B`.
         if let firstChar = lower.first,
            let color = PenColor.allCases.first(where: { $0.shortcutCharacter == firstChar }),
            !commandHeld {
             state.setColor(color, highlight: shiftHeld)
+            state.setTool(.ink)
             return
         }
 

@@ -164,7 +164,7 @@ final class DrawingTests: XCTestCase {
     // MARK: - DrawingAnnotation.style
 
     func testBlurAnnotationHasNoStyle() {
-        let blur = DrawingAnnotation.blur(BlurStroke(width: 20, points: [.zero]))
+        let blur = DrawingAnnotation.blur(BlurArea(rect: CGRect(x: 0, y: 0, width: 10, height: 10)))
         XCTAssertNil(blur.style)
     }
 

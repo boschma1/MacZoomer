@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var hotkeys = HotkeyManager(preferences: preferences)
     lazy var zoomMode = ZoomMode(preferences: preferences, permissions: permissions)
     lazy var liveZoomMode = LiveZoomMode(preferences: preferences, permissions: permissions)
-    lazy var drawingMode = DrawingMode()
+    lazy var drawingMode = DrawingMode(permissions: permissions)
     lazy var screenshotMode = ScreenshotMode(preferences: preferences, permissions: permissions)
     lazy var recordingMode = RecordingMode(preferences: preferences, permissions: permissions)
     lazy var breakTimerMode = BreakTimerMode(preferences: preferences)

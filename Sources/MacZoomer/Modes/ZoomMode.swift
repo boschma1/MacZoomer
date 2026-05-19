@@ -29,6 +29,15 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
         guard !isActive else { return }
         isActive = true
 
+        // Activate *before* the async screen-capture hop. We're an `LSUIElement`
+        // / `.accessory` app and the hotkey that brought us here is the user-
+        // initiated event macOS requires for cross-app focus. After an `await`
+        // we're on a later runloop turn and `NSApp.activate` is much more
+        // likely to be silently denied — leaving the zoom overlay visible but
+        // keystrokes (notably Esc) still routed to the previously frontmost
+        // app, so the user has to click into the overlay before Esc works.
+        NSApp.activate(ignoringOtherApps: true)
+
         Task { @MainActor in
             do {
                 let captures = try await capturer.captureAllDisplays()
@@ -140,6 +149,16 @@ public final class ZoomMode: NSObject, ObservableObject, @MainActor ZoomWindowDe
             if preferences.zoomAnimate {
                 window.zoomView.performZoomInAnimation()
             }
+        }
+
+        // Belt-and-suspenders: activate once more after the windows are on
+        // screen, in case the earlier activate-before-await call was racy.
+        // `makeKeyAndOrderFront` only makes a window *key* for the active
+        // application, so we activate first and then re-make-key here.
+        NSApp.activate(ignoringOtherApps: true)
+        if let topWindow = windows.last {
+            topWindow.makeKey()
+            topWindow.makeFirstResponder(topWindow)
         }
 
         NSCursor.hide()

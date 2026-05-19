@@ -44,6 +44,12 @@ public final class LiveZoomMode: NSObject, ObservableObject, @MainActor LiveZoom
         guard !isActive else { return }
         isActive = true
 
+        // See ZoomMode.activate() — activate the app *before* the async hop
+        // so the user-initiated hotkey context still grants cross-app focus
+        // from our `.accessory` activation policy. Without this, Esc routes
+        // to the previously frontmost app until the user clicks the overlay.
+        NSApp.activate(ignoringOtherApps: true)
+
         Task { @MainActor in
             do {
                 guard CGPreflightScreenCaptureAccess() else {
@@ -168,6 +174,14 @@ public final class LiveZoomMode: NSObject, ObservableObject, @MainActor LiveZoom
             if preferences.zoomAnimate {
                 window.liveView.performZoomInAnimation()
             }
+        }
+
+        // Re-assert activation + key-window status after the windows are on
+        // screen, in case the earlier activate-before-await call was racy.
+        NSApp.activate(ignoringOtherApps: true)
+        if let topWindow = contexts.last?.window {
+            topWindow.makeKey()
+            topWindow.makeFirstResponder(topWindow)
         }
 
         NSCursor.hide()
