@@ -11,6 +11,7 @@ final class MenuBarController {
     private let liveZoomMode: LiveZoomMode
     private let drawingMode: DrawingMode
     private let breakTimerMode: BreakTimerMode
+    private let updater: UpdaterController
     private let openSettings: () -> Void
     private let dispatchAction: (HotkeyAction) -> Void
 
@@ -24,6 +25,7 @@ final class MenuBarController {
         liveZoomMode: LiveZoomMode,
         drawingMode: DrawingMode,
         breakTimerMode: BreakTimerMode,
+        updater: UpdaterController,
         openSettings: @escaping () -> Void,
         dispatchAction: @escaping (HotkeyAction) -> Void
     ) {
@@ -34,6 +36,7 @@ final class MenuBarController {
         self.liveZoomMode = liveZoomMode
         self.drawingMode = drawingMode
         self.breakTimerMode = breakTimerMode
+        self.updater = updater
         self.openSettings = openSettings
         self.dispatchAction = dispatchAction
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -147,6 +150,14 @@ final class MenuBarController {
         )
         prefs.target = self
         menu.addItem(prefs)
+
+        let checkForUpdates = NSMenuItem(
+            title: "Check for Updates…",
+            action: updater.menuAction(),
+            keyEquivalent: ""
+        )
+        checkForUpdates.target = updater.menuTarget()
+        menu.addItem(checkForUpdates)
 
         menu.addItem(.separator())
 

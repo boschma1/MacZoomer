@@ -7,11 +7,14 @@
 # Examples:
 #   scripts/make-dmg.sh build/Build/Products/Release/MacZoomer.app artifacts/MacZoomer-0.1.0.dmg
 #
-# No external dependencies — uses macOS's bundled `hdiutil` directly.
-# The resulting DMG is ad-hoc signed (no Developer ID); Gatekeeper will
-# warn on first launch and the user must right-click → Open. Signing &
-# notarization are wired in later once a Developer ID certificate is in
-# place.
+# If $MACZOOMER_SIGN_IDENTITY is set, the resulting DMG is codesigned with
+# that identity (e.g. "Developer ID Application: qualified.ink GmbH
+# (5R57LQA4MP)") using a secure timestamp. Notarization + stapling are run
+# separately by the caller (see scripts/release-local.sh and
+# .github/workflows/release.yml).
+#
+# If $MACZOOMER_SIGN_IDENTITY is empty, the DMG is left ad-hoc and
+# Gatekeeper will warn on first launch.
 
 set -euo pipefail
 
@@ -45,6 +48,12 @@ hdiutil create \
     -fs HFS+ \
     -imagekey zlib-level=9 \
     "$OUTPUT_DMG"
+
+if [[ -n "${MACZOOMER_SIGN_IDENTITY:-}" ]]; then
+    echo "→ Codesigning DMG with: $MACZOOMER_SIGN_IDENTITY"
+    codesign --force --sign "$MACZOOMER_SIGN_IDENTITY" --timestamp "$OUTPUT_DMG"
+    codesign --verify --verbose=2 "$OUTPUT_DMG"
+fi
 
 echo "✓ DMG ready: $OUTPUT_DMG"
 echo "  $(du -h "$OUTPUT_DMG" | cut -f1)"

@@ -2,7 +2,7 @@
 
 A native macOS screen-zoom, annotation, screenshot, and recording tool for technical presentations and demos. Inspired by [Sysinternals ZoomIt](https://learn.microsoft.com/sysinternals/downloads/zoomit) — reimplemented from scratch for macOS.
 
-> **Status:** 🛠 Pre-release. Zoom, Live Zoom, Drawing, Screenshots, and the Break Timer are functional. Screen Recording is functional in dev (⌘5 verified). Notarized distribution is blocked on Apple Developer ID enrollment — see [docs/demos/](docs/demos/README.md) for the demo-recording workflow.
+> **Status:** 🛠 Pre-release. Zoom, Live Zoom, Drawing, Screenshots, the Break Timer, and Screen Recording are functional. Builds are now signed with Developer ID and notarized by Apple, with auto-updates via Sparkle.
 
 ## Features
 
@@ -14,8 +14,8 @@ A native macOS screen-zoom, annotation, screenshot, and recording tool for techn
 | Live Zoom (real-time magnification with pan) | ⌘4 | ✅ |
 | Live Draw (annotate the live desktop) | ⌘⇧4 | ✅ |
 | Copy / save full screen or region as PNG | ⌘6 / ⌘⇧6 / ⌘⌃6 / ⌘⇧⌃6 | ✅ |
-| Screen Recording (MP4) | ⌘5 / ⌘⇧5 / ⌘⌥5 | 🧪 in dev |
-| Auto-update via Sparkle + signed/notarized DMG | — | ⏳ blocked on Developer ID |
+| Screen Recording (MP4) | ⌘5 / ⌘⇧5 / ⌘⌥5 | ✅ |
+| Auto-update via Sparkle + signed/notarized DMG | — | ✅ |
 
 Every shortcut is rebindable in Settings → Hotkeys. Settings can be exported/imported as JSON.
 
@@ -43,22 +43,30 @@ open MacZoomer.xcodeproj
 swift build
 ```
 
-A signed Release `.app` for local installation:
+A Developer-ID-signed, notarized Release `.app` + DMG for local distribution
+(requires the Developer ID Application certificate in your keychain and
+notarytool credentials stored under profile `MacZoomerNotary` —
+see [`docs/RELEASING.md`](docs/RELEASING.md)):
+
+```sh
+scripts/release-local.sh           # uses MARKETING_VERSION from project.yml
+scripts/release-local.sh 0.5.0     # override version
+```
+
+To build an unsigned `.app` for local-only smoke testing (no Apple
+Developer cert required):
 
 ```sh
 xcodebuild -project MacZoomer.xcodeproj -scheme MacZoomer -configuration Release \
   -derivedDataPath build CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO \
   CODE_SIGNING_ALLOWED=NO build
-
-codesign --force --deep --sign - \
-  --identifier com.markusbosch.MacZoomer --options runtime \
-  --entitlements Sources/MacZoomer/Resources/MacZoomer.entitlements \
-  build/Build/Products/Release/MacZoomer.app
-
-cp -R build/Build/Products/Release/MacZoomer.app /Applications/
 ```
 
-Full Developer ID signing, notarization, and DMG packaging will be wired into a GitHub Actions release workflow before v1.0.
+Tagged pushes (`vX.Y.Z`) trigger
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which
+builds, signs, notarizes, staples, packages the DMG, publishes the
+Sparkle `appcast.xml` to GitHub Pages, and creates a draft GitHub
+Release.
 
 ## Permissions
 
@@ -69,4 +77,3 @@ If you build from source, every fresh build produces a new code-signing hash, wh
 ## License
 
 [MIT](LICENSE) © 2026 Markus Bosch
-

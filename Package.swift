@@ -11,9 +11,15 @@ let package = Package(
     products: [
         .library(name: "MacZoomerCore", targets: ["MacZoomerCore"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.4")
+    ],
     targets: [
         .target(
             name: "MacZoomerCore",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/MacZoomer",
             exclude: [
                 "Resources/Info.plist",

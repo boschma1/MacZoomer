@@ -22,12 +22,16 @@ jobs:
   build-and-release:
     name: Build & publish
     runs-on: macos-15
+    env:
+      SIGN_IDENTITY: "Developer ID Application: qualified.ink GmbH (5R57LQA4MP)"
+      APPLE_TEAM_ID: "5R57LQA4MP"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Determine version
+      - name: Determine version and paths
         id: version
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -36,8 +40,10 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
           fi
           VERSION="${TAG#v}"
-          echo "tag=$TAG"     >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Make KEYCHAIN_PATH available to all later steps.
+          echo "KEYCHAIN_PATH=$RUNNER_TEMP/maczoomer-signing.keychain-db" >> "$GITHUB_ENV"
 
       - name: Pick latest Xcode
         run: |
@@ -53,44 +59,123 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build Release (ad-hoc signed)
+      - name: Import Developer ID certificate
+        env:
+          APPLE_DEV_ID_P12_BASE64: ${{ secrets.APPLE_DEV_ID_P12_BASE64 }}
+          APPLE_DEV_ID_P12_PASSWORD: ${{ secrets.APPLE_DEV_ID_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          if [[ -z "$APPLE_DEV_ID_P12_BASE64" ]]; then
+            echo "::error::APPLE_DEV_ID_P12_BASE64 secret is missing"
+            exit 1
+          fi
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          echo -n "$APPLE_DEV_ID_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_DEV_ID_P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
+            -T /usr/bin/productsign
+          rm -f "$CERT_PATH"
+
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "→ Available signing identities:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Build Release (Developer ID signed)
         run: |
           xcodebuild \
             -project MacZoomer.xcodeproj \
             -scheme MacZoomer \
             -configuration Release \
             -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp --keychain $KEYCHAIN_PATH" \
             MARKETING_VERSION=${{ steps.version.outputs.version }} \
             build
 
-      - name: Re-sign with entitlements
+      - name: Re-sign with entitlements (deep, hardened, timestamped)
         run: |
-          codesign --force --deep --sign - \
-            --identifier com.markusbosch.MacZoomer \
-            --options runtime \
+          codesign --force --deep --sign "$SIGN_IDENTITY" \
+            --keychain "$KEYCHAIN_PATH" \
+            --options runtime --timestamp \
             --entitlements Sources/MacZoomer/Resources/MacZoomer.entitlements \
             build/Build/Products/Release/MacZoomer.app
 
       - name: Verify signature
         run: |
-          codesign -dv --verbose=4 build/Build/Products/Release/MacZoomer.app || true
-          spctl --assess --type execute --verbose build/Build/Products/Release/MacZoomer.app || true
+          codesign --verify --deep --strict --verbose=2 build/Build/Products/Release/MacZoomer.app
+          codesign -dv --verbose=4 build/Build/Products/Release/MacZoomer.app
 
-      - name: Build DMG
+      - name: Notarize .app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          APP_ZIP="$RUNNER_TEMP/MacZoomer.zip"
+          ditto -c -k --keepParent build/Build/Products/Release/MacZoomer.app "$APP_ZIP"
+          xcrun notarytool submit "$APP_ZIP" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+      - name: Staple .app
+        run: |
+          xcrun stapler staple build/Build/Products/Release/MacZoomer.app
+          xcrun stapler validate build/Build/Products/Release/MacZoomer.app
+          spctl --assess --type execute --verbose build/Build/Products/Release/MacZoomer.app
+
+      - name: Build signed DMG
         run: |
           mkdir -p artifacts
-          scripts/make-dmg.sh \
-            build/Build/Products/Release/MacZoomer.app \
-            artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg \
-            "MacZoomer ${{ steps.version.outputs.version }}"
+          MACZOOMER_SIGN_IDENTITY="$SIGN_IDENTITY" \
+            scripts/make-dmg.sh \
+              build/Build/Products/Release/MacZoomer.app \
+              artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg \
+              "MacZoomer ${{ steps.version.outputs.version }}"
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool submit artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+      - name: Staple DMG
+        run: |
+          xcrun stapler staple artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg
+          xcrun stapler validate artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg
+          spctl --assess --type open --context context:primary-signature --verbose \
+            artifacts/MacZoomer-${{ steps.version.outputs.version }}.dmg
 
       - name: Generate SHA-256 sums
         run: |
           cd artifacts
-          shasum -a 256 *.dmg | tee SHA256SUMS.txt
+          shasum -a 256 -- *.dmg | tee SHA256SUMS.txt
+
+      - name: Publish appcast entry to gh-pages
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: scripts/publish-appcast.sh "artifacts/MacZoomer-${VERSION}.dmg"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -114,16 +199,18 @@ jobs:
           body: |
             ## MacZoomer ${{ steps.version.outputs.tag }}
 
-            > ⚠️ This build is **ad-hoc signed only** (no Developer ID yet).
-            > macOS Gatekeeper will refuse to open it directly. After downloading:
-            >
-            > 1. Move `MacZoomer.app` to `/Applications`.
-            > 2. **Right-click → Open**, then click **Open** in the warning dialog.
-            > 3. Subsequent launches work normally.
-            >
-            > Notarized DMGs and a Homebrew Cask are tracked in [Phase 8 of the roadmap](https://github.com/boschma1/MacZoomer).
+            Signed with Developer ID and notarized by Apple. Drag
+            `MacZoomer.app` from the DMG into `/Applications` and launch
+            normally — no right-click → Open dance needed.
+
+            Future versions install automatically via Sparkle.
 
             ### SHA-256
             ```
             $(cat artifacts/SHA256SUMS.txt)
             ```
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true

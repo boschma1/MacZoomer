@@ -30,5 +30,13 @@
 	<true/>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>MacZoomer needs Screen Recording access to magnify, annotate, and record your screen.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://boschma1.github.io/MacZoomer/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>n5/uG1OpXzwCZO6rKhXGdc52WPlZdx/s6+br+ErRsUA=</string>
 </dict>
 </plist>

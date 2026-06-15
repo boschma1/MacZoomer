@@ -14,7 +14,13 @@ settings:
     CURRENT_PROJECT_VERSION: "4"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: "5R57LQA4MP"
     SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.4"
 
 targets:
   MacZoomer:
@@ -27,6 +33,9 @@ targets:
           - "Resources/MacZoomer.entitlements"
     resources:
       - path: Sources/MacZoomer/Resources/Assets.xcassets
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
     info:
       path: Sources/MacZoomer/Resources/Info.plist
       properties:
@@ -39,6 +48,10 @@ targets:
         NSHighResolutionCapable: true
         NSScreenCaptureUsageDescription: "MacZoomer needs Screen Recording access to magnify, annotate, and record your screen."
         NSAppleEventsUsageDescription: "MacZoomer uses Apple Events to lock the workstation when the break timer starts."
+        SUFeedURL: "https://boschma1.github.io/MacZoomer/appcast.xml"
+        SUPublicEDKey: "n5/uG1OpXzwCZO6rKhXGdc52WPlZdx/s6+br+ErRsUA="
+        SUEnableInstallerLauncherService: false
+        SUEnableAutomaticChecks: true
     entitlements:
       path: Sources/MacZoomer/Resources/MacZoomer.entitlements
       properties:

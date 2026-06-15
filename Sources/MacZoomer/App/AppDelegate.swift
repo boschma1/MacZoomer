@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var screenshotMode = ScreenshotMode(preferences: preferences, permissions: permissions)
     lazy var recordingMode = RecordingMode(preferences: preferences, permissions: permissions)
     lazy var breakTimerMode = BreakTimerMode(preferences: preferences)
+    lazy var updater = UpdaterController()
 
     private var menuBarController: MenuBarController?
     private var settingsWindowController: SettingsWindowController?
@@ -33,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             liveZoomMode: liveZoomMode,
             drawingMode: drawingMode,
             breakTimerMode: breakTimerMode,
+            updater: updater,
             openSettings: { [weak self] in self?.openSettings() },
             dispatchAction: { [weak self] action in self?.dispatch(action: action) }
         )
