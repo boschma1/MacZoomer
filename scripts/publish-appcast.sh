@@ -24,6 +24,13 @@ DMG="${1:?usage: $0 <dmg-path>}"
 : "${TAG:?TAG env var required}"
 : "${REPO:?REPO env var required}"
 
+# BUILD is the integer encoded from VERSION (1.2.3 -> 10203). When called
+# standalone (e.g. from scripts/release-local.sh), derive it on the fly.
+if [[ -z "${BUILD:-}" ]]; then
+    IFS='.' read -r MAJ MIN PATCH <<<"$VERSION"
+    BUILD=$(( ${MAJ:-0} * 10000 + ${MIN:-0} * 100 + ${PATCH:-0} ))
+fi
+
 if [[ ! -f "$DMG" ]]; then
     echo "✗ DMG not found: $DMG" >&2
     exit 1
@@ -50,9 +57,10 @@ SIZE="$(stat -f%z "$DMG" 2>/dev/null || stat -c%s "$DMG")"
 DMG_NAME="$(basename "$DMG")"
 DMG_URL="https://github.com/${REPO}/releases/download/${TAG}/${DMG_NAME}"
 PUBDATE="$(LC_TIME=C date -u +'%a, %d %b %Y %H:%M:%S +0000')"
-# Use a monotonic build number derived from the timestamp so Sparkle
-# treats every release as newer than the last.
-BUILD="$(date -u +'%Y%m%d%H%M')"
+# Use the same monotonic build number that the .app's CFBundleVersion
+# carries (computed from VERSION above). Sparkle compares
+# CFBundleVersion against sparkle:version, so they must match for
+# the upgrade detector to work correctly.
 
 ITEM_FILE="$WORK_DIR/item.xml"
 cat > "$ITEM_FILE" <<EOF

@@ -40,10 +40,15 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
           fi
           VERSION="${TAG#v}"
+          # Build number: derive a monotonic integer from the version.
+          # 1.2.3 -> 10203, 12.0.0 -> 120000, etc. Each component is 0-99.
+          IFS='.' read -r MAJ MIN PATCH <<<"$VERSION"
+          BUILD=$(( ${MAJ:-0} * 10000 + ${MIN:-0} * 100 + ${PATCH:-0} ))
           echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          # Make KEYCHAIN_PATH available to all later steps.
+          echo "build=$BUILD"     >> "$GITHUB_OUTPUT"
           echo "KEYCHAIN_PATH=$RUNNER_TEMP/maczoomer-signing.keychain-db" >> "$GITHUB_ENV"
+          echo "→ version=$VERSION build=$BUILD"
 
       - name: Pick latest Xcode
         run: |
@@ -103,6 +108,7 @@ jobs:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             OTHER_CODE_SIGN_FLAGS="--timestamp --keychain $KEYCHAIN_PATH" \
             MARKETING_VERSION=${{ steps.version.outputs.version }} \
+            CURRENT_PROJECT_VERSION=${{ steps.version.outputs.build }} \
             build
 
       - name: Re-sign with entitlements (deep, hardened, timestamped)
@@ -173,6 +179,7 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
           TAG: ${{ steps.version.outputs.tag }}
           REPO: ${{ github.repository }}
         run: scripts/publish-appcast.sh "artifacts/MacZoomer-${VERSION}.dmg"

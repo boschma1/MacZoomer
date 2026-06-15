@@ -37,7 +37,13 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
-echo "→ Releasing MacZoomer $VERSION as $SIGN_IDENTITY (team $TEAM_ID)"
+# Derive a monotonic build number from the version (1.2.3 -> 10203). This
+# matches the scheme used in .github/workflows/release.yml so the app's
+# CFBundleVersion aligns with the appcast's sparkle:version.
+IFS='.' read -r MAJ MIN PATCH <<<"$VERSION"
+BUILD=$(( ${MAJ:-0} * 10000 + ${MIN:-0} * 100 + ${PATCH:-0} ))
+
+echo "→ Releasing MacZoomer $VERSION (build $BUILD) as $SIGN_IDENTITY (team $TEAM_ID)"
 
 echo "→ Generating Xcode project"
 xcodegen generate
@@ -53,6 +59,7 @@ xcodebuild \
     DEVELOPMENT_TEAM="$TEAM_ID" \
     OTHER_CODE_SIGN_FLAGS=--timestamp \
     MARKETING_VERSION="$VERSION" \
+    CURRENT_PROJECT_VERSION="$BUILD" \
     build
 
 APP_PATH="build/Build/Products/Release/MacZoomer.app"
