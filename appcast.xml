@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone="yes"?>
+<rss version="2.0"
+    xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+    xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>MacZoomer</title>
+        <link>https://boschma1.github.io/MacZoomer/appcast.xml</link>
+        <description>Updates for MacZoomer</description>
+        <language>en</language>
+    </channel>
+</rss>
