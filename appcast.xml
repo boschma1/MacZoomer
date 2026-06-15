@@ -15,9 +15,8 @@
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
                 url="https://github.com/boschma1/MacZoomer/releases/download/v1.0.0/MacZoomer-1.0.0.dmg"
-                length="2459124"
                 type="application/octet-stream"
-                sparkle:edSignature="cd+80knaywbEZl0gK7/dp6heHf83dgdavIckbCnaPZy6Bn8yqZXHU0eACuMKtnavjx1K+3AJpu/1tXJMAG2oAw==" length="2459124" />
+                sparkle:edSignature="cd+80knaywbEZl0gK7/dp6heHf83dgdavIckbCnaPZy6Bn8yqZXHU0eACuMKtnavjx1K+3AJpu/1tXJMAG2oAw==" />
         </item>
     </channel>
 </rss>
