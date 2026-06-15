@@ -53,7 +53,6 @@ SIG_LINE="$("$WORK_DIR/bin/sign_update" --ed-key-file "$KEY_FILE" "$DMG")"
 rm -f "$KEY_FILE"
 echo "  $SIG_LINE"
 
-SIZE="$(stat -f%z "$DMG" 2>/dev/null || stat -c%s "$DMG")"
 DMG_NAME="$(basename "$DMG")"
 DMG_URL="https://github.com/${REPO}/releases/download/${TAG}/${DMG_NAME}"
 PUBDATE="$(LC_TIME=C date -u +'%a, %d %b %Y %H:%M:%S +0000')"
@@ -63,6 +62,9 @@ PUBDATE="$(LC_TIME=C date -u +'%a, %d %b %Y %H:%M:%S +0000')"
 # the upgrade detector to work correctly.
 
 ITEM_FILE="$WORK_DIR/item.xml"
+# sign_update emits `sparkle:edSignature="..." length="..."`, so we do
+# NOT include length= ourselves — that would produce a duplicate
+# attribute and the appcast would be invalid XML.
 cat > "$ITEM_FILE" <<EOF
         <item>
             <title>Version ${VERSION}</title>
@@ -72,7 +74,6 @@ cat > "$ITEM_FILE" <<EOF
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
                 url="${DMG_URL}"
-                length="${SIZE}"
                 type="application/octet-stream"
                 ${SIG_LINE} />
         </item>
