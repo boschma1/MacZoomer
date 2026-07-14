@@ -18,5 +18,16 @@
                 type="application/octet-stream"
                 sparkle:edSignature="cd+80knaywbEZl0gK7/dp6heHf83dgdavIckbCnaPZy6Bn8yqZXHU0eACuMKtnavjx1K+3AJpu/1tXJMAG2oAw==" length="2459124" />
         </item>
+        <item>
+            <title>Version 1.1.0</title>
+            <pubDate>Tue, 14 Jul 2026 19:49:44 +0000</pubDate>
+            <sparkle:version>10100</sparkle:version>
+            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/boschma1/MacZoomer/releases/download/v1.1.0/MacZoomer-1.1.0.dmg"
+                type="application/octet-stream"
+                sparkle:edSignature="wI4NcH6s1lHJS1RjsGxmqDg2OmAUT/NhSdokwzZcXD5SYWqGPA0I9NgTCmDEPCHYjgTYjRor3i6tW35N7nTHCA==" length="2480124" />
+        </item>
     </channel>
 </rss>
