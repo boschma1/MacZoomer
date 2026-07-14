@@ -19,6 +19,8 @@ A native macOS screen-zoom, annotation, screenshot, and recording tool for techn
 
 Every shortcut is rebindable in Settings → Hotkeys. Settings can be exported/imported as JSON.
 
+While drawing (⌘2), press **H** for an on-screen hub listing every tool, color, and modifier.
+
 Out of scope for v1: OCR, DemoType, panorama recording, audio in recordings (deferred to v1.1).
 
 ## Requirements

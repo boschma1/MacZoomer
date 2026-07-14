@@ -32,6 +32,9 @@ final class DrawingCanvas: NSView {
 
     private var observers = Set<AnyCancellable>()
 
+    /// Whether the "press H" shortcuts hub overlay is currently shown.
+    private var hubVisible: Bool = false
+
     var onExit: (() -> Void)?
 
     /// Black-on-white pencil cursor, hotspot at the pencil's writing tip.
@@ -139,6 +142,10 @@ final class DrawingCanvas: NSView {
         }
         if let draft = state.inProgressText {
             renderTextDraft(draft, in: context)
+        }
+
+        if hubVisible {
+            drawHub(in: context)
         }
     }
 
@@ -297,7 +304,271 @@ final class DrawingCanvas: NSView {
         renderTextStamp(draft, caretVisible: caretVisible, isCommitted: false)
     }
 
-    // MARK: - Caret blinking
+    // MARK: - Shortcuts hub overlay
+
+    /// A single labelled key/option "chip" inside the hub.
+    private struct HubChip {
+        let key: String
+        let label: String
+        let active: Bool
+        let swatch: NSColor?
+
+        init(key: String, label: String, active: Bool = false, swatch: NSColor? = nil) {
+            self.key = key
+            self.label = label
+            self.active = active
+            self.swatch = swatch
+        }
+    }
+
+    /// A titled group of chips.
+    private struct HubSection {
+        let title: String
+        let chips: [HubChip]
+    }
+
+    // Layout constants for the hub.
+    private static let hubPanelWidth: CGFloat = 640
+    private static let hubSidePad: CGFloat = 24
+    private static let hubTopPad: CGFloat = 22
+    private static let hubBottomPad: CGFloat = 22
+    private static let hubChipHeight: CGFloat = 32
+    private static let hubChipHGap: CGFloat = 8
+    private static let hubChipVGap: CGFloat = 8
+    private static let hubSectionGap: CGFloat = 18
+    private static let hubSectionTitleGap: CGFloat = 8
+    private static let hubHeaderGap: CGFloat = 16
+    private static let hubChipPadX: CGFloat = 12
+    private static let hubSwatchSize: CGFloat = 12
+    private static let hubSwatchGap: CGFloat = 8
+    private static let hubKeyLabelGap: CGFloat = 8
+
+    private static let hubKeyFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
+    private static let hubLabelFont = NSFont.systemFont(ofSize: 13, weight: .regular)
+    private static let hubSectionTitleFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
+    private static let hubHeaderFont = NSFont.systemFont(ofSize: 17, weight: .bold)
+    private static let hubFooterFont = NSFont.systemFont(ofSize: 11, weight: .regular)
+    private static let hubAccent = NSColor(srgbRed: 0.35, green: 0.62, blue: 1.0, alpha: 1.0)
+
+    private func hubSections() -> [HubSection] {
+        let tool = state.currentTool
+        let bg = state.background
+        let color = state.currentColor
+        let inkActive = tool == .ink
+
+        let colorChips = PenColor.allCases.map { c in
+            HubChip(
+                key: String(c.shortcutCharacter).uppercased(),
+                label: c.displayName,
+                active: inkActive && color == c,
+                swatch: c.nsColor
+            )
+        }
+
+        return [
+            HubSection(title: "TOOLS", chips: [
+                HubChip(key: "I", label: "Pen", active: tool == .ink),
+                HubChip(key: "B", label: "Blur", active: tool == .blur),
+                HubChip(key: "T", label: "Text", active: tool == .text),
+            ]),
+            HubSection(title: "COLORS   ·   hold ⇧ for highlight", chips: colorChips),
+            HubSection(title: "CANVAS", chips: [
+                HubChip(key: "W", label: "Whiteboard", active: bg == .whiteboard),
+                HubChip(key: "K", label: "Blackboard", active: bg == .blackboard),
+                HubChip(key: "E", label: "Erase all"),
+            ]),
+            HubSection(title: "SHAPES   ·   hold a modifier while dragging", chips: [
+                HubChip(key: "—", label: "Freehand"),
+                HubChip(key: "⇧", label: "Line"),
+                HubChip(key: "⌥", label: "Rectangle"),
+                HubChip(key: "⌃", label: "Ellipse"),
+                HubChip(key: "⇧⌥", label: "Arrow"),
+            ]),
+            HubSection(title: "SIZE & EDIT", chips: [
+                HubChip(key: "↑↓", label: "Width \(Int(state.currentWidth.rounded())) px"),
+                HubChip(key: "⌃scroll", label: "Width"),
+                HubChip(key: "⌘Z", label: "Undo"),
+                HubChip(key: "Esc", label: "Exit"),
+            ]),
+        ]
+    }
+
+    private func hubChipWidth(_ chip: HubChip) -> CGFloat {
+        var w = Self.hubChipPadX * 2
+        if chip.swatch != nil {
+            w += Self.hubSwatchSize + Self.hubSwatchGap
+        }
+        if !chip.key.isEmpty {
+            let keySize = (chip.key as NSString).size(withAttributes: [.font: Self.hubKeyFont])
+            w += keySize.width + Self.hubKeyLabelGap
+        }
+        let labelSize = (chip.label as NSString).size(withAttributes: [.font: Self.hubLabelFont])
+        w += labelSize.width
+        return w
+    }
+
+    /// Wraps a section's chips into visual rows that fit `contentWidth`.
+    private func hubRows(for chips: [HubChip], contentWidth: CGFloat) -> [[HubChip]] {
+        var rows: [[HubChip]] = []
+        var current: [HubChip] = []
+        var currentWidth: CGFloat = 0
+        for chip in chips {
+            let w = hubChipWidth(chip)
+            if current.isEmpty {
+                current = [chip]
+                currentWidth = w
+            } else if currentWidth + Self.hubChipHGap + w <= contentWidth {
+                current.append(chip)
+                currentWidth += Self.hubChipHGap + w
+            } else {
+                rows.append(current)
+                current = [chip]
+                currentWidth = w
+            }
+        }
+        if !current.isEmpty { rows.append(current) }
+        return rows
+    }
+
+    private func drawHub(in context: CGContext) {
+        let sections = hubSections()
+        let contentWidth = Self.hubPanelWidth - Self.hubSidePad * 2
+
+        // Pre-wrap every section so we know the panel height before drawing.
+        let laidOut: [(title: String, rows: [[HubChip]])] = sections.map {
+            ($0.title, hubRows(for: $0.chips, contentWidth: contentWidth))
+        }
+
+        let headerHeight = (Self.hubHeaderFont.ascender - Self.hubHeaderFont.descender)
+        let sectionTitleHeight = (Self.hubSectionTitleFont.ascender - Self.hubSectionTitleFont.descender)
+        let footerHeight = (Self.hubFooterFont.ascender - Self.hubFooterFont.descender)
+
+        var panelHeight = Self.hubTopPad + Self.hubBottomPad
+        panelHeight += headerHeight + Self.hubHeaderGap
+        for section in laidOut {
+            panelHeight += sectionTitleHeight + Self.hubSectionTitleGap
+            let rowCount = CGFloat(section.rows.count)
+            panelHeight += rowCount * Self.hubChipHeight
+            panelHeight += max(0, rowCount - 1) * Self.hubChipVGap
+            panelHeight += Self.hubSectionGap
+        }
+        panelHeight += footerHeight // footer hint line
+
+        let panelRect = NSRect(
+            x: (bounds.width - Self.hubPanelWidth) / 2,
+            y: (bounds.height - panelHeight) / 2,
+            width: Self.hubPanelWidth,
+            height: panelHeight
+        )
+
+        // Dim the whole screen slightly so the hub reads clearly over any
+        // background (frozen screen, whiteboard, or busy drawings).
+        context.saveGState()
+        context.setFillColor(NSColor.black.withAlphaComponent(0.28).cgColor)
+        context.fill(bounds)
+        context.restoreGState()
+
+        // Panel background + border.
+        let panelPath = NSBezierPath(roundedRect: panelRect, xRadius: 18, yRadius: 18)
+        NSColor(white: 0.10, alpha: 0.95).setFill()
+        panelPath.fill()
+        NSColor(white: 1.0, alpha: 0.12).setStroke()
+        panelPath.lineWidth = 1
+        panelPath.stroke()
+
+        let leftX = panelRect.minX + Self.hubSidePad
+        var topY = panelRect.maxY - Self.hubTopPad
+
+        // Header.
+        drawHubText("Drawing shortcuts", font: Self.hubHeaderFont,
+                    color: .white, x: leftX, topY: topY)
+        topY -= headerHeight + Self.hubHeaderGap
+
+        for section in laidOut {
+            drawHubText(section.title, font: Self.hubSectionTitleFont,
+                        color: NSColor(white: 0.62, alpha: 1.0), x: leftX, topY: topY)
+            topY -= sectionTitleHeight + Self.hubSectionTitleGap
+
+            for row in section.rows {
+                var x = leftX
+                for chip in row {
+                    let w = hubChipWidth(chip)
+                    let chipRect = NSRect(x: x, y: topY - Self.hubChipHeight,
+                                          width: w, height: Self.hubChipHeight)
+                    drawHubChip(chip, in: chipRect)
+                    x += w + Self.hubChipHGap
+                }
+                topY -= Self.hubChipHeight + Self.hubChipVGap
+            }
+            topY += Self.hubChipVGap // last row has no trailing gap
+            topY -= Self.hubSectionGap
+        }
+
+        // Footer hint, right-aligned.
+        let footer = "H or Esc to close"
+        let footerSize = (footer as NSString).size(withAttributes: [.font: Self.hubFooterFont])
+        drawHubText(footer, font: Self.hubFooterFont,
+                    color: NSColor(white: 0.5, alpha: 1.0),
+                    x: panelRect.maxX - Self.hubSidePad - footerSize.width,
+                    topY: panelRect.minY + Self.hubBottomPad + footerHeight)
+    }
+
+    private func drawHubChip(_ chip: HubChip, in rect: NSRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
+        if chip.active {
+            NSColor(white: 1.0, alpha: 0.16).setFill()
+            path.fill()
+            Self.hubAccent.setStroke()
+            path.lineWidth = 1.5
+            path.stroke()
+        } else {
+            NSColor(white: 1.0, alpha: 0.07).setFill()
+            path.fill()
+        }
+
+        var x = rect.minX + Self.hubChipPadX
+
+        if let swatch = chip.swatch {
+            let dot = NSRect(x: x, y: rect.midY - Self.hubSwatchSize / 2,
+                             width: Self.hubSwatchSize, height: Self.hubSwatchSize)
+            swatch.setFill()
+            NSBezierPath(ovalIn: dot).fill()
+            NSColor(white: 1.0, alpha: 0.35).setStroke()
+            let ring = NSBezierPath(ovalIn: dot)
+            ring.lineWidth = 0.5
+            ring.stroke()
+            x += Self.hubSwatchSize + Self.hubSwatchGap
+        }
+
+        if !chip.key.isEmpty {
+            let keyColor = chip.active ? Self.hubAccent : NSColor(white: 0.95, alpha: 1.0)
+            let keyAttrs: [NSAttributedString.Key: Any] = [
+                .font: Self.hubKeyFont, .foregroundColor: keyColor,
+            ]
+            let keyStr = NSAttributedString(string: chip.key, attributes: keyAttrs)
+            let keySize = keyStr.size()
+            keyStr.draw(at: NSPoint(x: x, y: rect.midY - keySize.height / 2))
+            x += keySize.width + Self.hubKeyLabelGap
+        }
+
+        let labelAttrs: [NSAttributedString.Key: Any] = [
+            .font: Self.hubLabelFont,
+            .foregroundColor: NSColor(white: 0.88, alpha: 1.0),
+        ]
+        let labelStr = NSAttributedString(string: chip.label, attributes: labelAttrs)
+        let labelSize = labelStr.size()
+        labelStr.draw(at: NSPoint(x: x, y: rect.midY - labelSize.height / 2))
+    }
+
+    /// Draws a single line of text whose visual top sits at `topY`.
+    private func drawHubText(_ text: String, font: NSFont, color: NSColor, x: CGFloat, topY: CGFloat) {
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        let str = NSAttributedString(string: text, attributes: attrs)
+        let size = str.size()
+        str.draw(at: NSPoint(x: x, y: topY - size.height))
+    }
+
+
 
     private func updateCaretTimer() {
         let needsTimer = (state.inProgressText != nil)
@@ -320,6 +591,14 @@ final class DrawingCanvas: NSView {
     // MARK: - Input
 
     override func mouseDown(with event: NSEvent) {
+        // A click while the shortcuts hub is open just dismisses it; it must
+        // not start a stroke underneath the overlay.
+        if hubVisible {
+            hubVisible = false
+            needsDisplay = true
+            return
+        }
+
         let point = convert(event.locationInWindow, from: nil)
         dragStart = point
 
@@ -438,8 +717,14 @@ final class DrawingCanvas: NSView {
         let shiftHeld = event.modifierFlags.contains(.shift)
         let commandHeld = event.modifierFlags.contains(.command)
 
-        // Esc exits draw mode (when no in-progress text).
+        // Esc exits draw mode (when no in-progress text). If the shortcuts hub
+        // is open, Esc closes it first instead of tearing down draw mode.
         if event.keyCode == 53 {
+            if hubVisible {
+                hubVisible = false
+                needsDisplay = true
+                return
+            }
             onExit?()
             return
         }
@@ -455,6 +740,15 @@ final class DrawingCanvas: NSView {
         // ⌘Z undo
         if commandHeld && lower == "z" {
             state.undoLast()
+            return
+        }
+
+        // H toggles the shortcuts hub overlay (a legend of every drawing
+        // option). Only active outside text entry — inside text entry "h" is
+        // a literal character (handled above).
+        if lower == "h" && !commandHeld {
+            hubVisible.toggle()
+            needsDisplay = true
             return
         }
 
